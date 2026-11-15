@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] - 2026-11-15
+
+### Added
+- Task keys act on the task under the pointer, so hovering a task and pressing Backspace moves it to trash. They work on board cards, kanban cards, Up next, week items, the day panel and calendar chips, not only list rows. Backspace also trashes the task open in the task panel.
+- New task keys: the arrow keys (like J and K), Y to move to today, 1, 2 and 3 to set priority, 0 to clear it, Delete to trash, and Esc to clear the selection.
+- Calendar keys: the arrow keys page, T jumps to today, and D, W and M switch between day, week and month.
+- The Calendar page reads events from the Mac's Calendar app, so every account added there shows up (iCloud, Google, Exchange, subscriptions). It is read-only. macOS asks for Calendar access the first time. Without access, Doem falls back to the iCloud connection as before.
+
+### Known issues
+- The app is not signed, so macOS may ask for Calendar access again after an update.
+
 ## [1.0.0] - 2026-11-13
 
 ### Changed
