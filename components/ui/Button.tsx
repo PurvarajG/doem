@@ -18,7 +18,7 @@ const BASE =
 
 const SIZE = {
   md: { primary: "h-9 px-4 text-secondary", ghost: "h-9 px-4 text-secondary", chip: "h-9 px-3.5 text-secondary" },
-  sm: { primary: "h-[30px] px-3 text-meta", ghost: "h-[30px] px-3 text-meta", chip: "h-[30px] px-3 text-meta" },
+  sm: { primary: "h-7.5 px-3 text-meta", ghost: "h-7.5 px-3 text-meta", chip: "h-7.5 px-3 text-meta" },
 } as const;
 
 function colours(

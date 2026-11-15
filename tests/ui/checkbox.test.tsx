@@ -72,7 +72,7 @@ describe("Checkbox", () => {
     render(<Checkbox checked={false} onCheckedChange={() => {}} label="Task" />);
     const box = screen.getByRole("checkbox");
     expect(box).toHaveAttribute("data-part", "chk");
-    expect(box).toHaveClass("size-[18px]", "rounded-check", "bg-surface", "inset-ring-line-strong", "hover:inset-ring-ink-3");
+    expect(box).toHaveClass("size-4.5", "rounded-check", "bg-surface", "inset-ring-line-strong", "hover:inset-ring-ink-3");
   });
 
   test("checked fills with ink and shows a surface-coloured check", () => {

@@ -45,7 +45,7 @@ export default function TopBar({
     <header
       data-part="bar"
       className={`drag-region flex h-16 shrink-0 items-center gap-3 border-b border-line px-6 ${
-        sidebarCollapsed ? "[[data-desktop]_&]:pl-20" : ""
+        sidebarCollapsed ? "[[data-desktop]_&]:pl-[80px]" : ""
       }`}
     >
       {sidebarCollapsed && (
@@ -85,7 +85,7 @@ export default function TopBar({
         type="button"
         aria-label="Search"
         onClick={() => openCommandPalette()}
-        className="no-drag ml-auto flex h-9 w-full min-w-0 max-w-[300px] items-center gap-2 rounded-full bg-sunk pl-3.5 pr-1.5 text-left text-secondary text-ink-3 transition-shadow duration-150 ease-out hover:shadow-[inset_0_0_0_1px_var(--color-line-2)]"
+        className="no-drag ml-auto flex h-9 w-full min-w-0 max-w-75 items-center gap-2 rounded-full bg-sunk pl-3.5 pr-1.5 text-left text-secondary text-ink-3 transition-shadow duration-150 ease-out hover:shadow-[inset_0_0_0_1px_var(--color-line-2)]"
       >
         <Icon name="search" />
         <span className="min-w-0 flex-1 truncate">Search tasks, projects…</span>

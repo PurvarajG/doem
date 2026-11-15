@@ -111,7 +111,7 @@ describe("Segmented", () => {
     const { unmount } = render(
       <Segmented options={OPTIONS} value="day" onChange={() => {}} ariaLabel="A" />,
     );
-    expect(screen.getByRole("radio", { name: "Day" }).className).toContain("h-[34px]");
+    expect(screen.getByRole("radio", { name: "Day" }).className).toContain("h-8.5");
     unmount();
     render(
       <Segmented
@@ -122,7 +122,7 @@ describe("Segmented", () => {
         size="sm"
       />,
     );
-    expect(screen.getByRole("radio", { name: "Day" }).className).toContain("h-[28px]");
+    expect(screen.getByRole("radio", { name: "Day" }).className).toContain("h-7");
   });
 
   test("renders an icon beside the label", () => {

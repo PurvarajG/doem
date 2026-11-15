@@ -14,6 +14,7 @@ import DesktopBridge from "./DesktopBridge";
 import CommandPalette from "./CommandPalette";
 import KeyboardShortcuts from "./KeyboardShortcuts";
 import { readStoredKey } from "@/lib/storage-key";
+import { useDensity } from "./useDensity";
 
 const KEY = "doem.sidebarCollapsed";
 const listeners = new Set<() => void>();
@@ -52,6 +53,8 @@ export function useSidebarCollapsed(): [boolean, (next: boolean) => void] {
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const pathname = usePathname();
+  // Keeps <html data-density> current (Auto follows the screen).
+  useDensity();
 
   // The capture window is the composer alone: no chrome, and no DesktopBridge
   // or Reminders, which the main window already runs.
@@ -67,7 +70,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
             carved only by later-painted `.no-drag` elements, so every control
             inside this 36px band declares `.no-drag`. `pointer-events-none`
             keeps the plain web build from losing clicks to this strip. */}
-        <div className="drag-region pointer-events-none absolute inset-x-0 top-0 h-9" />
+        <div className="drag-region pointer-events-none absolute inset-x-0 top-0 h-[36px]" />
         {!collapsed && (
           <Sidebar collapsed={false} onToggleCollapsed={() => setCollapsed(true)} />
         )}

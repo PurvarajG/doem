@@ -273,15 +273,14 @@ describe("PageHead", () => {
     expect(aside.className).not.toMatch(/rail:items-/);
   });
 
-  test("the frame is left-aligned with no max width", () => {
+  test("the frame fills the panel up to 96rem, then centres on a large display", () => {
     const { container } = render(
       <PageHead title="Today">
         <p>Body</p>
       </PageHead>,
     );
     const root = container.firstElementChild as HTMLElement;
-    expect(root.className).not.toContain("mx-auto");
-    expect(root.className).not.toMatch(/(?:^|\s)max-w-/);
+    expect(root).toHaveClass("w-full", "max-w-[96rem]", "mx-auto");
   });
 
   test("the head row carries data-part head, bottom-aligned with a 24px gap", () => {

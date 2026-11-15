@@ -40,8 +40,13 @@
  * panel's bottom edge, as the mockup's page does, and the panes carry the 32px
  * of end-of-page air as their own bottom padding (`pb-9` = 32px plus the gutter).
  *
- * The frame is left-aligned at the panel's 32px padding on every route, with no
- * max width; a page that wants a reading width wraps its own body.
+ * The frame is left-aligned at the panel's 32px padding on every route up to
+ * 96rem (1536px) wide; past that, on a large display, it centres, so a task
+ * row's title never sits a whole screen away from its own time and actions.
+ * A page that wants a narrower reading width wraps its own body.
+ *
+ * In a short window (`short:`, under 920px tall) the head spends less height
+ * above the body: a smaller top padding and gaps, so lists start higher.
  *
  * `actions` is wrapped in `.no-drag` so callers never have to remember to
  * opt out of the titlebar drag band.
@@ -90,9 +95,9 @@ export default function PageHead({
 
   return (
     <div
-      className="w-full px-8 py-8 shell:flex shell:h-full shell:flex-col shell:overflow-hidden shell:px-8 shell:pb-0"
+      className="mx-auto w-full max-w-[96rem] px-8 py-8 short:pt-6 shell:flex shell:h-full shell:flex-col shell:overflow-hidden shell:px-8 shell:pb-0"
     >
-      <header className="flex shrink-0 flex-col gap-6">
+      <header className="flex shrink-0 flex-col gap-6 short:gap-4">
         <div data-part="head" className="flex items-end gap-6">
           {leading ? (
             <div className="flex min-w-0 items-center gap-4">
@@ -110,7 +115,7 @@ export default function PageHead({
 
       <div
         data-testid={rail ? workspaceTestId : undefined}
-        className={`pane-scroll mt-6 grid grid-cols-1 gap-6 shell:-mx-1 shell:mt-5 shell:min-h-0 shell:flex-1 shell:overflow-y-auto shell:p-1 shell:pb-9${
+        className={`pane-scroll mt-6 grid grid-cols-1 gap-6 shell:-mx-1 shell:mt-5 shell:short:mt-3 shell:min-h-0 shell:flex-1 shell:overflow-y-auto shell:p-1 shell:pb-9${
           rail
             ? " rail:grid-cols-[minmax(28rem,1fr)_var(--width-rail)] rail:grid-rows-[minmax(0,1fr)] rail:gap-x-6 rail:overflow-hidden rail:pb-1"
             : ""

@@ -16,7 +16,7 @@ const BASE =
 const VARIANT: Record<NonNullable<InputProps["variant"]>, string> = {
   field: "h-10 gap-2 rounded-row bg-sunk px-3 text-body text-ink",
   composer:
-    "h-[52px] gap-3 rounded-composer bg-surface pl-4 pr-2 text-body text-ink shadow-sm",
+    "h-13 gap-3 rounded-composer bg-surface pl-4 pr-2 text-body text-ink shadow-sm",
   search:
     "h-9 gap-2 rounded-full bg-sunk pl-3.5 pr-1.5 text-secondary text-ink",
 };

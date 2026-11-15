@@ -102,7 +102,7 @@ describe("Button", () => {
     expect(c).not.toMatch(/(^| )bg-(accent|surface|raised)/);
     rerender(<Button variant="chip" size="sm">A</Button>);
     c = screen.getByRole("button").className;
-    expect(c).toContain("h-[30px]");
+    expect(c).toContain("h-7.5");
     expect(c).toContain("px-3");
     expect(c).toContain("text-meta");
     expect(c).toContain("text-ink");

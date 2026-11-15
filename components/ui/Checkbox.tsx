@@ -14,7 +14,7 @@ export interface CheckboxProps {
 }
 
 const BOX = {
-  md: "size-[18px] rounded-check before:-inset-[3px]",
+  md: "size-4.5 rounded-check before:-inset-[3px]",
   sm: "size-4 rounded-check before:-inset-1",
 } as const;
 
