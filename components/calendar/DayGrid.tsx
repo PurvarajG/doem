@@ -107,6 +107,7 @@ export default function DayGrid({
             {untimed.map((task) => (
               <button
                 key={task.id}
+                data-task-id={task.id}
                 type="button"
                 onClick={() => openTask(task.id)}
                 aria-label={task.title}
@@ -158,6 +159,7 @@ export default function DayGrid({
               return (
                 <button
                   key={b.key}
+                  data-task-id={b.kind === "tracked" ? undefined : (b.taskId ?? undefined)}
                   type="button"
                   onClick={() => b.taskId && openTask(b.taskId)}
                   aria-label={b.kind === "tracked" ? `${b.title}, tracked ${time}` : b.title}

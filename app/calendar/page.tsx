@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTasks } from "@/lib/store-context";
 import { useNow } from "@/lib/useNow";
 import { daysBetween, toISODate } from "@/lib/parse";
+import { isTypingTarget } from "@/lib/shortcuts";
 import { shiftDays } from "@/lib/summary";
 import {
   CALENDAR_VIEWS,
@@ -85,6 +86,38 @@ function Calendar() {
     },
     [params, router],
   );
+
+  // Calendar keys: arrows page, T jumps to today, D/W/M switch the view. T and
+  // D belong to a task when one is selected or under the pointer (tomorrow,
+  // pick a day), so they only move the calendar when none is.
+  const keyState = useRef({ view, anchorISO, todayISO, setView });
+  useEffect(() => {
+    keyState.current = { view, anchorISO, todayISO, setView };
+  });
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isTypingTarget(event.target) || isTypingTarget(document.activeElement)) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+      const { view, anchorISO, todayISO, setView } = keyState.current;
+      if (!anchorISO) return;
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      const taskTargeted = document.querySelector("[data-kbd-selected]") !== null;
+
+      if (key === "ArrowLeft" || key === "ArrowRight") {
+        // The view switch moves between its own options with these keys.
+        if (document.activeElement?.closest('[role="radiogroup"]')) return;
+        setCursor(shift(view, anchorISO, key === "ArrowLeft" ? -1 : 1));
+      } else if (key === "t" && !taskTargeted) setCursor(todayISO);
+      else if (key === "d" && !taskTargeted) setView("day");
+      else if (key === "w") setView("week");
+      else if (key === "m") setView("month");
+      else return;
+      event.preventDefault();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const tasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>();

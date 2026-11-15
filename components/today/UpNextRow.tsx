@@ -51,7 +51,8 @@ export default function UpNextRow({
   return (
     <div
       data-testid="up-next"
-      className="-mx-1 mb-2 grid grid-cols-[20px_minmax(0,1fr)] items-center rail:grid-cols-[20px_minmax(0,1fr)_auto] gap-3 rounded-composer bg-raised p-4 shadow-md ring-1 ring-line-2"
+      data-task-id={task.id}
+      className="kbd-ring -mx-1 mb-2 grid grid-cols-[20px_minmax(0,1fr)] items-center rail:grid-cols-[20px_minmax(0,1fr)_auto] gap-3 rounded-composer bg-raised p-4 shadow-md ring-1 ring-line-2"
     >
       <Checkbox
         checked={false}

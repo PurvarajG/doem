@@ -50,7 +50,8 @@ export default function BoardCard({ task, todayISO, actions, dimmed }: BoardCard
 
   return (
     <li
-      className={`group relative bg-surface rounded-tab p-3 ring-1 ring-line shadow-sm transition-shadow hover:ring-line-2 hover:shadow-md ${
+      data-task-id={task.id}
+      className={`kbd-ring group relative bg-surface rounded-tab p-3 ring-1 ring-line shadow-sm transition-shadow hover:ring-line-2 hover:shadow-md ${
         dimmed || hidden ? "opacity-60" : ""
       }`}
     >

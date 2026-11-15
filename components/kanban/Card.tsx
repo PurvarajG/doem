@@ -70,8 +70,9 @@ export default function Card({
 
   return (
     <li
+      data-task-id={task.id}
       {...dragProps}
-      className={`group relative bg-surface rounded-tab p-3 ring-1 ring-line shadow-sm transition-shadow hover:ring-line-2 hover:shadow-md ${
+      className={`kbd-ring group relative bg-surface rounded-tab p-3 ring-1 ring-line shadow-sm transition-shadow hover:ring-line-2 hover:shadow-md ${
         dragging ? "opacity-40" : hidden ? "opacity-60" : ""
       }`}
     >

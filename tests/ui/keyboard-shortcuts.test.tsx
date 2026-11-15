@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
@@ -105,6 +105,72 @@ describe("KeyboardShortcuts", () => {
     await userEvent.keyboard("j{Backspace}");
     await waitFor(() => expect(mock.calls.some((c) => c.url.includes(A.id))).toBe(true));
     await waitFor(() => expect(li(B.id)).toHaveAttribute("data-kbd-selected", "true"));
+  });
+
+  test("Backspace trashes the task under the pointer, with no j or k first", async () => {
+    const { mock } = setup();
+    await screen.findByText("First task");
+    fireEvent.mouseMove(screen.getByText("Second task"));
+    expect(li(B.id)).toHaveAttribute("data-kbd-selected", "hover");
+    await userEvent.keyboard("{Backspace}");
+    await waitFor(() => expect(mock.calls.some((c) => c.url.includes(B.id))).toBe(true));
+    expect(mock.calls.some((c) => c.url.includes(A.id))).toBe(false);
+    // The mark does not jump to a neighbour the pointer never touched.
+    expect(document.querySelector("[data-kbd-selected]")).toBeNull();
+  });
+
+  test("moving the pointer off a task drops it as the target", async () => {
+    const { mock } = setup();
+    await screen.findByText("First task");
+    fireEvent.mouseMove(screen.getByText("Second task"));
+    fireEvent.mouseMove(document.body);
+    await userEvent.keyboard("{Backspace}");
+    expect(mock.calls.some((c) => c.url.includes(B.id))).toBe(false);
+  });
+
+  test("a keyboard selection survives the pointer moving over empty space", async () => {
+    setup();
+    await screen.findByText("First task");
+    await userEvent.keyboard("j");
+    fireEvent.mouseMove(document.body);
+    expect(li(A.id)).toHaveAttribute("data-kbd-selected", "true");
+  });
+
+  test("Backspace trashes the task open in the panel", async () => {
+    const { mock } = setup();
+    await screen.findByText("First task");
+    await userEvent.keyboard("je");
+    expect(screen.getByTestId("open-id")).toHaveTextContent(A.id);
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "dialog");
+    document.body.appendChild(panel);
+    try {
+      await userEvent.keyboard("{Backspace}");
+      await waitFor(() => expect(mock.calls.some((c) => c.url.includes(A.id))).toBe(true));
+      expect(screen.getByTestId("open-id")).toHaveTextContent("");
+    } finally {
+      panel.remove();
+    }
+  });
+
+  test("arrow keys move like j and k, Escape clears", async () => {
+    setup();
+    await screen.findByText("First task");
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+    expect(li(B.id)).toHaveAttribute("data-kbd-selected", "true");
+    await userEvent.keyboard("{ArrowUp}");
+    expect(li(A.id)).toHaveAttribute("data-kbd-selected", "true");
+    await userEvent.keyboard("{Escape}");
+    expect(document.querySelector("[data-kbd-selected]")).toBeNull();
+  });
+
+  test("1 sets high priority, y moves to today", async () => {
+    const { mock } = setup();
+    await screen.findByText("First task");
+    await userEvent.keyboard("j1");
+    await waitFor(() => expect(JSON.stringify(mock.calls)).toContain('"priority":1'));
+    await userEvent.keyboard("y");
+    await waitFor(() => expect(JSON.stringify(mock.calls)).toContain(TODAY));
   });
 
   test("f starts a focus session on the selected task", async () => {

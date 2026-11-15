@@ -120,6 +120,7 @@ export default function WeekGrid({
     return (
       <button
         key={b.key}
+        data-task-id={b.taskId ?? undefined}
         type="button"
         draggable
         title={b.title}
@@ -178,6 +179,7 @@ export default function WeekGrid({
                 {untimed.slice(0, 2).map((task) => (
                   <button
                     key={task.id}
+                    data-task-id={task.id}
                     type="button"
                     draggable
                     title={task.title}

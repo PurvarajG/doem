@@ -16,7 +16,7 @@ export default function WeekTaskItem({ task }: WeekTaskItemProps) {
   const done = task.status === "done";
 
   return (
-    <li className="flex items-center gap-3 text-body">
+    <li data-task-id={task.id} className="kbd-ring flex items-center gap-3 rounded-row text-body">
       <Checkbox
         size="sm"
         label={`Mark done: ${task.title}`}

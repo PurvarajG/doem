@@ -15,6 +15,15 @@ const KEYS: [string, ShortcutAction][] = [
   ["e", "open"],
   ["Enter", "open"],
   ["Backspace", "trash"],
+  ["Delete", "trash"],
+  ["ArrowDown", "next"],
+  ["ArrowUp", "prev"],
+  ["y", "today"],
+  ["1", "priority"],
+  ["2", "priority"],
+  ["3", "priority"],
+  ["0", "noPriority"],
+  ["Escape", "clear"],
   ["/", "quickAdd"],
   ["?", "sheet"],
 ];
@@ -38,13 +47,13 @@ test("modifiers return null", () => {
 
 test("unknown keys return null", () => {
   assert.equal(matchShortcut({ key: "a" }), null);
-  assert.equal(matchShortcut({ key: "Escape" }), null);
+  assert.equal(matchShortcut({ key: "4" }), null);
   assert.equal(matchShortcut({ key: "constructor" }), null);
 });
 
 test("SHORTCUTS covers every action exactly once, in order", () => {
   const actions = SHORTCUTS.map((s) => s.action);
-  assert.deepEqual(actions, ["next", "prev", "done", "tomorrow", "pickDate", "timer", "focus", "commit", "open", "trash", "quickAdd", "sheet"]);
+  assert.deepEqual(actions, ["next", "prev", "done", "today", "tomorrow", "pickDate", "timer", "focus", "commit", "open", "priority", "noPriority", "trash", "clear", "quickAdd", "sheet"]);
   assert.equal(new Set(actions).size, actions.length);
   for (const [, action] of KEYS) assert.ok(actions.includes(action));
   assert.ok(SHORTCUTS.some((s) => s.label === "Start a focus session"));

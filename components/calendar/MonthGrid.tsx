@@ -109,6 +109,7 @@ export default function MonthGrid({
                     className={dragTaskId === task.id ? "opacity-40" : ""}
                   >
                     <button
+                      data-task-id={task.id}
                       onClick={() => openTask(task.id)}
                       title={task.title}
                       style={{ ["--c" as string]: colorOf(task) }}

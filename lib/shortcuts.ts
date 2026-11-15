@@ -12,22 +12,30 @@ export type ShortcutAction =
   | "commit"
   | "open"
   | "trash"
+  | "today"
+  | "priority"
+  | "noPriority"
+  | "clear"
   | "quickAdd"
   | "sheet";
 
 export type Shortcut = { action: ShortcutAction; keys: readonly string[]; label: string };
 
 export const SHORTCUTS: readonly Shortcut[] = [
-  { action: "next", keys: ["J"], label: "Next task" },
-  { action: "prev", keys: ["K"], label: "Previous task" },
+  { action: "next", keys: ["J", "↓"], label: "Next task" },
+  { action: "prev", keys: ["K", "↑"], label: "Previous task" },
   { action: "done", keys: ["X", "Space"], label: "Mark done" },
+  { action: "today", keys: ["Y"], label: "Move to today" },
   { action: "tomorrow", keys: ["T"], label: "Move to tomorrow" },
   { action: "pickDate", keys: ["D"], label: "Pick a day" },
   { action: "timer", keys: ["S"], label: "Start or stop the timer" },
   { action: "focus", keys: ["F"], label: "Start a focus session" },
   { action: "commit", keys: ["*"], label: "Commit to today" },
   { action: "open", keys: ["E", "Enter"], label: "Open task" },
+  { action: "priority", keys: ["1", "2", "3"], label: "Set priority: high, medium, low" },
+  { action: "noPriority", keys: ["0"], label: "Clear priority" },
   { action: "trash", keys: ["⌫"], label: "Move to trash" },
+  { action: "clear", keys: ["Esc"], label: "Clear the selection" },
   { action: "quickAdd", keys: ["/"], label: "Add a task" },
   { action: "sheet", keys: ["?"], label: "Show shortcuts" },
 ];
@@ -45,9 +53,29 @@ export const GLOBAL_SHORTCUTS: readonly { keys: readonly string[]; label: string
   { keys: ["⌘", "5"], label: "Go to All tasks" },
 ];
 
+// Handled by app/calendar/page.tsx. T and D fall through to the task keys when
+// a task is selected or under the pointer.
+export const CALENDAR_SHORTCUTS: readonly { keys: readonly string[]; label: string }[] = [
+  { keys: ["←"], label: "Previous day, week or month" },
+  { keys: ["→"], label: "Next day, week or month" },
+  { keys: ["T"], label: "Jump to today" },
+  { keys: ["D"], label: "Day view" },
+  { keys: ["W"], label: "Week view" },
+  { keys: ["M"], label: "Month view" },
+];
+
 const BY_KEY: Readonly<Record<string, ShortcutAction>> = {
   j: "next",
   k: "prev",
+  ArrowDown: "next",
+  ArrowUp: "prev",
+  y: "today",
+  "1": "priority",
+  "2": "priority",
+  "3": "priority",
+  "0": "noPriority",
+  Delete: "trash",
+  Escape: "clear",
   x: "done",
   " ": "done",
   t: "tomorrow",

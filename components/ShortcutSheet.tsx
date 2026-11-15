@@ -3,7 +3,7 @@
 import { Fragment } from "react";
 import Dialog from "@/components/ui/Dialog";
 import Kbd from "@/components/ui/Kbd";
-import { GLOBAL_SHORTCUTS, SHORTCUTS } from "@/lib/shortcuts";
+import { CALENDAR_SHORTCUTS, GLOBAL_SHORTCUTS, SHORTCUTS } from "@/lib/shortcuts";
 
 const ROW = "flex items-center justify-between gap-4 rounded-row p-3";
 
@@ -23,7 +23,7 @@ export default function ShortcutSheet({ open, onClose }: { open: boolean; onClos
       open={open}
       onClose={onClose}
       title="Keyboard shortcuts"
-      description="Task keys work when you are not typing in a field."
+      description="Task keys act on the task under the pointer, or the one you picked with J and K."
     >
       <div className="-mt-4 max-h-[60vh] overflow-y-auto">
         <Group title="Task rows">
@@ -38,6 +38,14 @@ export default function ShortcutSheet({ open, onClose }: { open: boolean; onClos
                   </Fragment>
                 ))}
               </span>
+            </li>
+          ))}
+        </Group>
+        <Group title="Calendar">
+          {CALENDAR_SHORTCUTS.map((s) => (
+            <li key={s.label} className={ROW}>
+              <span className="text-secondary text-ink-2">{s.label}</span>
+              <Kbd keys={[...s.keys]} />
             </li>
           ))}
         </Group>

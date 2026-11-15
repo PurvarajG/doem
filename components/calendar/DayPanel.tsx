@@ -82,7 +82,8 @@ export function DayPanelBody({
             return (
               <li
                 key={task.id}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-row border-t border-line px-3 py-3 first:border-t-0"
+                data-task-id={task.id}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-row border-t border-line px-3 py-3 first:border-t-0 data-[kbd-selected=true]:bg-row-hover"
               >
                 <div className="min-w-0">
                   <button
