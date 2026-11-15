@@ -12,6 +12,7 @@ import Card, { CardHeader } from "@/components/ui/Card";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import PageHead from "@/components/ui/PageHead";
 import { hasDesktopOptions } from "@/lib/desktop-options";
+import { getMacCalendarStatus } from "@/lib/mac-calendar";
 
 /**
  * Rendered per request, never prerendered: otherwise CALENDAR_FEED_SECRET is
@@ -47,9 +48,10 @@ function Section({
   );
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
   const token = process.env.CALENDAR_FEED_SECRET || null;
   const icloudConfigured = Boolean(process.env.ICLOUD_APPLE_ID && process.env.ICLOUD_APP_PASSWORD);
+  const macCalendar = await getMacCalendarStatus();
   const desktop = hasDesktopOptions();
 
   const sections = [
@@ -81,7 +83,7 @@ export default function SettingsPage() {
           </Section>
           <Section id="calendar" label="Calendar feed" icon="cal">
             <CalendarFeed token={token} />
-            <ICloudStatus configured={icloudConfigured} />
+            <ICloudStatus configured={icloudConfigured} mac={macCalendar} />
           </Section>
           <Section
             id="tracking"

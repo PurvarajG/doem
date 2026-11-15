@@ -383,6 +383,9 @@ function startServer(port) {
         CALENDAR_FEED_SECRET: settings.calendarFeedSecret || "",
         ICLOUD_APPLE_ID: settings.icloudAppleId || "",
         ICLOUD_APP_PASSWORD: settings.icloudAppPassword || "",
+        // The native reader for the Mac's Calendar store (lib/mac-calendar.ts).
+        // A missing file is fine: the server falls back to iCloud.
+        DOEM_CALENDAR_HELPER: path.join(projectRoot, "build", "doem-calendar"),
         PGLITE_DIR: path.join(userDataDir(), "pglite"),
       },
       // A GUI launch has nowhere to inherit stdout to, so the server's output

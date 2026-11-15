@@ -124,6 +124,56 @@ test("the cache does not grow without bound", async () => {
   assert.ok(fetcher.calls.length <= 200);
 });
 
+test("the Mac's Calendar wins over iCloud and iCloud is never called", async () => {
+  const fetcher = fakeFetcher(async () => [event({ id: "from-icloud" })]);
+  const mac = async () => [event({ id: "from-mac" })];
+
+  const result = await loadExternalEvents(...RANGE, fetcher, mac);
+
+  assert.deepEqual(result, { events: [event({ id: "from-mac" })], ok: true });
+  assert.equal(fetcher.calls.length, 0);
+});
+
+test("the Mac's Calendar works with no iCloud credentials at all", async () => {
+  delete process.env.ICLOUD_APPLE_ID;
+  delete process.env.ICLOUD_APP_PASSWORD;
+
+  const result = await loadExternalEvents(...RANGE, undefined, async () => [event()]);
+
+  assert.deepEqual(result, { events: [event()], ok: true });
+});
+
+test("an unreadable or failing Mac Calendar falls back to iCloud", async () => {
+  const fetcher = fakeFetcher(async () => [event()]);
+
+  assert.deepEqual(await loadExternalEvents(...RANGE, fetcher, async () => null), { events: [event()], ok: true });
+  __resetCacheForTests();
+  const broken = async () => {
+    throw new Error("helper crashed");
+  };
+  assert.deepEqual(await loadExternalEvents(...RANGE, fetcher, broken), { events: [event()], ok: true });
+});
+
+test("Mac Calendar results are cached only briefly", async () => {
+  let calls = 0;
+  const mac = async () => {
+    calls++;
+    return [event()];
+  };
+  const realNow = Date.now;
+
+  await loadExternalEvents(...RANGE, undefined, mac);
+  await loadExternalEvents(...RANGE, undefined, mac);
+  assert.equal(calls, 1);
+  Date.now = () => realNow() + 31 * 1000;
+  try {
+    await loadExternalEvents(...RANGE, undefined, mac);
+  } finally {
+    Date.now = realNow;
+  }
+  assert.equal(calls, 2);
+});
+
 function request(query: string): Request {
   return new Request(`https://app.test/api/external-events${query}`);
 }

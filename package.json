@@ -19,9 +19,10 @@
     "screenshots": "node scripts/screenshots.mjs",
     "smoke:app": "node scripts/smoke-app.mjs",
     "electron:icon": "node scripts/make-icon.mjs",
+    "electron:helper": "node scripts/build-calendar-helper.mjs",
     "electron:dev": "electron .",
-    "electron:pack": "npm run electron:icon && next build && electron-builder --dir --arm64",
-    "electron:build": "npm run electron:icon && next build && electron-builder --arm64"
+    "electron:pack": "npm run electron:icon && npm run electron:helper && next build && electron-builder --dir --arm64",
+    "electron:build": "npm run electron:icon && npm run electron:helper && next build && electron-builder --arm64"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -63,6 +64,7 @@
       "public/**/*",
       "build/icon.png",
       "build/trayTemplate*.png",
+      "build/doem-calendar",
       "lib/**/*.sql",
       "next.config.ts",
       "package.json",
@@ -83,7 +85,11 @@
           ]
         }
       ],
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "NSCalendarsFullAccessUsageDescription": "Doem shows your calendar events next to your tasks. It only reads them and never changes your calendars.",
+        "NSCalendarsUsageDescription": "Doem shows your calendar events next to your tasks. It only reads them and never changes your calendars."
+      }
     },
     "win": {
       "target": "nsis"

@@ -57,6 +57,24 @@ describe("icloud status", () => {
     expect(screen.queryByText(/ICLOUD_APPLE_ID/)).not.toBeInTheDocument();
   });
 
+  test("says the Mac's Calendar is the source once access is granted", () => {
+    render(<ICloudStatus configured mac="granted" />);
+    expect(screen.getByText("Connected to Calendar on this Mac.")).toBeInTheDocument();
+    expect(screen.queryByText(/iCloud events appear/i)).not.toBeInTheDocument();
+  });
+
+  test("points at the permission prompt before access is decided, and keeps iCloud as the stand-in", () => {
+    render(<ICloudStatus configured mac="undetermined" />);
+    expect(screen.getByText(/Allow Full Access/)).toBeInTheDocument();
+    expect(screen.getByText("Using iCloud for now.")).toBeInTheDocument();
+  });
+
+  test("says where to turn access back on when it was refused", () => {
+    render(<ICloudStatus configured={false} mac="denied" />);
+    expect(screen.getByText("Calendar access is off.")).toBeInTheDocument();
+    expect(screen.queryByText("ICLOUD_APPLE_ID")).not.toBeInTheDocument();
+  });
+
   test("explains how to connect when not configured", () => {
     render(<ICloudStatus configured={false} />);
     expect(screen.getByText(/aren't connected yet/i)).toBeInTheDocument();
