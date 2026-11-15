@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] - 2026-11-15
+
+### Added
+- Settings › Appearance › Interface size: Auto, Compact or Comfortable. Compact is the size of a native Mac app: smaller controls, rows and spacing, with text one step smaller. Comfortable is the size Doem had before. Auto, the default, uses Compact on laptop screens and 1080p displays and Comfortable on larger displays. It goes by the screen, so resizing the window never changes the size of anything.
+
+### Changed
+- In a window under 920px tall (a 13" or 14" MacBook), KPI tiles on Today, Inbox, Tracking and the wrap-up fold to one line each, and the page header takes less room, so the list starts higher.
+- On a large display, pages stop growing at 1536px wide and centre.
+
+### Known issues
+- In Compact, narrow KPI tiles can cut a label short, for example "Week…". The numbers stay visible.
+
 ## [1.0.1] - 2026-11-15
 
 ### Added
