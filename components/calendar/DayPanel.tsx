@@ -114,7 +114,7 @@ export function DayPanelBody({
                         patchTask(task.id, { scheduled: e.target.value });
                         setMoving(null);
                       }}
-                      className="h-[30px] rounded-full bg-surface px-3 text-meta text-ink inset-ring-1 inset-ring-line-2"
+                      className="h-7.5 rounded-full bg-surface px-3 text-meta text-ink inset-ring-1 inset-ring-line-2"
                     />
                     <Button variant="ghost" size="sm" onClick={() => setMoving(null)}>
                       Cancel

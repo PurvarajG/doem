@@ -14,6 +14,11 @@ import { THEME_COLOR_DARK, THEME_COLOR_LIGHT, TITLE_TEMPLATE } from "@/lib/app-m
 // before any of the page's own scripts, so it's reliably present here.
 const THEME_INIT = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}try{if(window.doem)document.documentElement.dataset.desktop="";}catch(e){}})();`;
 
+// Same idea for density, so parts never jump size after load. Mirrors
+// resolveDensity in components/useDensity.ts: Auto is Compact on screens under
+// 1200pt tall. The capture window never takes a density.
+const DENSITY_INIT = `(function(){try{if(location.pathname==="/capture")return;var d=null;try{d=localStorage.getItem("density");}catch(e){}if(d!=="compact"&&d!=="comfortable")d=screen.height<1200?"compact":"comfortable";document.documentElement.dataset.density=d;}catch(e){}})();`;
+
 // v2 fonts: Geist for the UI, Geist Mono for numbers and small technical
 // labels, Instrument Serif for the moment line.
 const geist = Geist({
@@ -56,6 +61,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        <script dangerouslySetInnerHTML={{ __html: DENSITY_INIT }} />
       </head>
       <body className="min-h-full">
         <AppChrome>{children}</AppChrome>

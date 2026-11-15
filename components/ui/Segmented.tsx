@@ -19,13 +19,13 @@ export interface SegmentedProps<T extends string> {
 }
 
 const TRACK: Record<"md" | "sm", string> = {
-  md: "gap-[2px] p-1 rounded-composer",
-  sm: "gap-[2px] p-[3px] rounded-tab",
+  md: "gap-0.5 p-1 rounded-composer",
+  sm: "gap-0.5 p-0.75 rounded-tab",
 };
 
 const BUTTON: Record<"md" | "sm", string> = {
-  md: "h-[34px] px-[14px] rounded-tab text-body",
-  sm: "h-[28px] px-[10px] rounded-tile text-meta",
+  md: "h-8.5 px-3.5 rounded-tab text-body",
+  sm: "h-7 px-2.5 rounded-tile text-meta",
 };
 
 export default function Segmented<T extends string>({

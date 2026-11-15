@@ -7,7 +7,7 @@ export interface KbdProps {
 }
 
 const BASE =
-  "inline-block rounded-full bg-surface px-2 py-[3px] font-mono text-caption text-ink-3 ring-1 ring-line";
+  "inline-block rounded-full bg-surface px-2 py-0.75 font-mono text-caption text-ink-3 ring-1 ring-line";
 
 export default function Kbd({ children, keys, className }: KbdProps) {
   const classes = [BASE, className].filter(Boolean).join(" ");

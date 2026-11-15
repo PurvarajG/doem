@@ -57,7 +57,7 @@ export default function RecordsModule({ now, dayISO, todayISO }: { now: Date; da
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
             aria-label="Filter by category"
-            className="h-[30px] rounded-full bg-transparent px-3 text-meta text-ink inset-ring-1 inset-ring-line-2"
+            className="h-7.5 rounded-full bg-transparent px-3 text-meta text-ink inset-ring-1 inset-ring-line-2"
           >
             <option value="all">All categories</option>
             {categories.map((c) => (

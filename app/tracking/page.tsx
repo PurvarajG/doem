@@ -223,7 +223,7 @@ export default function TrackingPage() {
           <a
             href="/tracking/settings"
             aria-label="Tracking settings"
-            className="inline-flex h-[30px] shrink-0 items-center whitespace-nowrap rounded-full px-3 text-meta font-medium text-ink-2 hover:bg-sunk"
+            className="inline-flex h-7.5 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-meta font-medium text-ink-2 hover:bg-sunk"
           >
             Settings
           </a>

@@ -27,6 +27,12 @@
    on top of it. */
 @custom-variant rail (@media (min-width: 1200px));
 
+/* Short windows: a 13" or 14" MacBook gives a window about 840-860px tall.
+   Below 920px the Today header folds its KPI tiles to one line each so the
+   task list starts higher. A layout switch on window HEIGHT, separate from
+   density, which only sets the size of parts. */
+@custom-variant short (@media (max-height: 920px));
+
 
 /* ─────────────────────────────────────────────
    Design tokens (Doem v2, "Soft Studio"). Tailwind v4 reads @theme and
@@ -423,6 +429,59 @@
   --color-project-6: var(--dark-project-6);
   --color-project-7: var(--dark-project-7);
   --color-project-foreground: var(--dark-project-foreground);
+}
+
+/* ─────────────────────────────────────────────
+   Density. Comfortable is the mockup scale and needs no rule: it is the
+   @theme values above. Compact is Mac scale, for laptop screens:
+
+   - The spacing unit drops from 4px to 3px, so every h-/w-/size-/p-/m-/gap-
+     utility shrinks to 0.75 and lands on a whole pixel (h-10 40px -> 30px,
+     size-9 36px -> 27px). Use spacing-scale classes, not h-[34px], or a part
+     won't follow the setting.
+   - Text drops one step only, so type shrinks less than the boxes round it.
+   - Radii and the rail width shrink with the boxes.
+
+   Resolved onto <html data-density> by DENSITY_INIT (app/layout.tsx) before
+   paint and kept current by useDensity (components/useDensity.ts). Things
+   sized for the OS stay fixed in px: the 36px titlebar band and the 80px
+   traffic-light inset.
+   ───────────────────────────────────────────── */
+:root[data-density="compact"] {
+  --spacing: 3px;
+
+  --text-h1: 28px;
+  --text-moment: 28px;
+  --text-big: 30px;
+  --text-kpi: 20px;
+  --text-upnext: 15px;
+  --text-title: 14px;
+  --text-card-title: 13px;
+  --text-day-num: 26px;
+  --text-cal-day: 16px;
+  --text-cal-today: 13px;
+  --text-cal-today--line-height: 24px;
+  --text-pm-value: 19px;
+  --text-chart-total: 24px;
+  --text-logo: 14px;
+  --text-brand: 17px;
+  --text-nav-row: 13px;
+  --text-clock: 20px;
+  --text-body: 13px;
+  --text-secondary: 12px;
+  --text-meta: 11px;
+  /* --text-caption stays 11px: the floor for small text. */
+
+  --radius-tab: 8px;
+  --radius-row: 9px;
+  --radius-composer: 11px;
+  --radius-card: 14px;
+  --radius-panel: 17px;
+  --radius-kpi: 12px;
+  --radius-timer: 12px;
+  --radius-me: 11px;
+
+  --width-rail: 20rem;
 }
 
 /* Phase 5F utilities (soft.html .composer, .mom, .task + .task). */
