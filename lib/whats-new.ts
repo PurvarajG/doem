@@ -1,7 +1,7 @@
 import type { IconName } from "@/components/ui/Icon";
 
 /** Bump when the list below changes, so the sheet opens once more for everyone. */
-export const WHATS_NEW_VERSION = "p0-projects-tasks";
+export const WHATS_NEW_VERSION = "1.0.4";
 export const WHATS_NEW_SEEN_KEY = "doem.whatsNewSeen";
 /** Dispatched on window to open the sheet from anywhere (the profile menu). */
 export const WHATS_NEW_OPEN_EVENT = "doem:whats-new";
@@ -18,73 +18,35 @@ export type WhatsNewItem = {
 
 export const WHATS_NEW: { title: string; items: WhatsNewItem[] }[] = [
   {
-    title: "Boards",
-    items: [
-      {
-        icon: "board",
-        title: "Manage lanes in Project settings",
-        body: "Rename, reorder, limit, retype or remove a lane. New lanes land before Done.",
-        target: "project",
-      },
-      {
-        icon: "target",
-        title: "Cards land where you drop them",
-        body: "Moving a card down its lane, or after trashing one, no longer lands a slot off.",
-        target: "project",
-      },
-      {
-        icon: "repeat",
-        title: "Repeating tasks repeat however you finish them",
-        body: "Dragging to Done or changing the lane creates the next one. Reopening takes it back if you haven't started it.",
-      },
-      {
-        icon: "trash",
-        title: "Restore brings a task back as it was",
-        body: "A finished task you trash and restore comes back finished, in Done.",
-      },
-    ],
-  },
-  {
-    title: "Planning",
-    items: [
-      {
-        icon: "plus",
-        title: "Lane tasks start without a date",
-        body: "Adding to a lane no longer puts the task on Today. Type a day, like tomorrow, to date it.",
-        target: "project",
-      },
-      {
-        icon: "inbox",
-        title: "Inbox is for unsorted tasks",
-        body: "A project task with no date is backlog now, not Inbox.",
-        target: "inbox",
-      },
-      {
-        icon: "cal",
-        title: "Multi-day tasks show on every day",
-        body: "Next 7 days lists them on each day they span, and counts them once.",
-        target: "upcoming",
-      },
-      {
-        icon: "repeat",
-        title: "Repeat keeps your interval",
-        body: "Switching every 2 weeks to monthly keeps every 2.",
-      },
-    ],
-  },
-  {
     title: "Projects",
     items: [
       {
         icon: "folder",
-        title: "Archived projects have a home",
-        body: "Settings lists them with Un-archive. #name in quick add skips them.",
-        target: "archived",
+        title: "Sort projects into folders",
+        body: "Click New folder in the sidebar, then drag projects onto it, or pick a folder in Project settings. Click a folder to fold it away.",
+      },
+    ],
+  },
+  {
+    title: "Boards",
+    items: [
+      {
+        icon: "board",
+        title: "Edit columns right on the board",
+        body: "Click a column name to rename it. Its menu moves, limits or deletes it. + adds a column: type a name and press Enter.",
+        target: "project",
       },
       {
-        icon: "x",
-        title: "Delete says what happens",
-        body: "The sidebar now shows how many tasks lose their project, same as Settings.",
+        icon: "list",
+        title: "Start a board from a template",
+        body: "An empty board offers Standard, Simple, Software, Content and Pipeline. Switching later keeps every task.",
+        target: "project",
+      },
+      {
+        icon: "plus",
+        title: "Save your own templates",
+        body: "Project settings > Board template > Save these columns as a template. It shows up on every new board.",
+        target: "project",
       },
     ],
   },
