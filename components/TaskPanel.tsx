@@ -352,7 +352,7 @@ function PanelBody({ task }: { task: Task }) {
                     recurrence: e.target.value
                       ? {
                           freq: e.target.value as RecurrenceFreq,
-                          interval: 1,
+                          interval: task.recurrence?.interval ?? 1,
                           ...(task.recurrence?.from ? { from: task.recurrence.from } : {}),
                         }
                       : undefined,

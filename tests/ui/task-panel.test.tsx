@@ -179,6 +179,45 @@ describe("shared task detail panel", () => {
     );
   });
 
+  test("changing Repeat keeps a custom interval", async () => {
+    const { dialog, mock, task } = await openPanel({ recurrence: { freq: "weekly", interval: 2 } });
+    // More opens by itself when a repeat is set.
+    await userEvent.selectOptions(within(dialog).getByRole("combobox", { name: "Repeat" }), "monthly");
+    await waitFor(() =>
+      expect(mock.calls).toContainEqual({
+        url: `/api/tasks/${task.id}`,
+        method: "PATCH",
+        body: { recurrence: { freq: "monthly", interval: 2 } },
+      }),
+    );
+  });
+
+  test("changing Repeat keeps 'when I finish it' and the interval", async () => {
+    const { dialog, mock, task } = await openPanel({ recurrence: { freq: "weekly", interval: 3, from: "done" } });
+    // More opens by itself when a repeat is set.
+    await userEvent.selectOptions(within(dialog).getByRole("combobox", { name: "Repeat" }), "monthly");
+    await waitFor(() =>
+      expect(mock.calls).toContainEqual({
+        url: `/api/tasks/${task.id}`,
+        method: "PATCH",
+        body: { recurrence: { freq: "monthly", interval: 3, from: "done" } },
+      }),
+    );
+  });
+
+  test("choosing a Repeat on a task with no recurrence starts at interval 1", async () => {
+    const { dialog, mock, task } = await openPanel();
+    await userEvent.click(within(dialog).getByRole("button", { name: "More" }));
+    await userEvent.selectOptions(within(dialog).getByRole("combobox", { name: "Repeat" }), "daily");
+    await waitFor(() =>
+      expect(mock.calls).toContainEqual({
+        url: `/api/tasks/${task.id}`,
+        method: "PATCH",
+        body: { recurrence: { freq: "daily", interval: 1 } },
+      }),
+    );
+  });
+
   test("Hide until and Expires patch startOn and expiresOn", async () => {
     const { dialog, mock, task } = await openPanel();
     await userEvent.click(within(dialog).getByRole("button", { name: "More" }));
