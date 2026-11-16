@@ -1,9 +1,0 @@
-{
-  "name": "doem-download-site",
-  "version": "1.0.2",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "node build.mjs"
-  }
-}
