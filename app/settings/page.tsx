@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AppearanceSection from "@/components/settings/AppearanceSection";
+import ArchivedProjects from "@/components/settings/ArchivedProjects";
 import CalendarFeed from "@/components/settings/CalendarFeed";
 import DesktopSection from "@/components/settings/DesktopSection";
 import ICloudStatus from "@/components/settings/ICloudStatus";
@@ -58,6 +59,7 @@ export default async function SettingsPage() {
     { id: "appearance", label: "Appearance" },
     { id: "today", label: "Today" },
     { id: "sidebar", label: "Sidebar" },
+    { id: "projects", label: "Projects" },
     { id: "calendar", label: "Calendar feed" },
     { id: "tracking", label: "Tracking" },
     ...(desktop ? [{ id: "desktop", label: "Desktop" }] : []),
@@ -80,6 +82,9 @@ export default async function SettingsPage() {
           </Section>
           <Section id="sidebar" label="Sidebar" icon="panel">
             <NavVisibility />
+          </Section>
+          <Section id="projects" label="Projects" icon="folder">
+            <ArchivedProjects />
           </Section>
           <Section id="calendar" label="Calendar feed" icon="cal">
             <CalendarFeed token={token} />
