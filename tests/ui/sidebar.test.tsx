@@ -150,8 +150,8 @@ describe("sidebar groups and actions", () => {
       setup();
       fireEvent.click(await screen.findByRole("button", { name: "Delete Alpha" }));
       const dialog = screen.getByRole("alertdialog");
-      expect(dialog).toHaveAccessibleName('Delete "Alpha"?');
-      expect(dialog).toHaveTextContent("Its tasks move to No project.");
+      expect(dialog).toHaveAccessibleName("Delete Alpha?");
+      expect(dialog).toHaveTextContent("This project has no tasks.");
     });
 
     it("Cancel closes it without deleting", async () => {
@@ -173,7 +173,7 @@ describe("sidebar groups and actions", () => {
     it("Delete removes the project once", async () => {
       const { mock } = setup();
       fireEvent.click(await screen.findByRole("button", { name: "Delete Alpha" }));
-      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+      fireEvent.click(screen.getByRole("button", { name: "Yes, delete Alpha" }));
       expect(screen.queryByRole("alertdialog")).toBeNull();
       await waitFor(() => expect(deletes(mock)).toHaveLength(1));
       expect(deletes(mock)[0].url).toBe("/api/projects/p1");
