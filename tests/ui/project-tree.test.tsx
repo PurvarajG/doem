@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { projectDeleteConsequence } from "@/lib/project-delete";
 import ProjectTree from "@/components/sidebar/ProjectTree";
 import { emptyWorkspace, makeProject, makeStages, makeTask, renderWorkspace } from "./harness";
 
@@ -193,9 +194,31 @@ describe("ProjectTree", () => {
     const { mock } = renderWorkspace(<ProjectTree />, workspace());
     fireEvent.click(await screen.findByRole("button", { name: "Delete Alpha" }));
     const dialog = screen.getByRole("alertdialog");
-    expect(dialog).toHaveAccessibleName('Delete "Alpha"?');
-    expect(dialog).toHaveTextContent("Its tasks move to No project.");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    expect(dialog).toHaveAccessibleName("Delete Alpha?");
+    // Same words, same count as the dialog in Project settings.
+    expect(dialog).toHaveAccessibleDescription(projectDeleteConsequence(2));
+    expect(dialog).toHaveAccessibleDescription(
+      "2 tasks keep existing, but they move to no project and lose their column.",
+    );
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Yes, delete Alpha" }));
     await waitFor(() => expect(mock.calls.filter((c) => c.method === "DELETE")).toHaveLength(1));
+  });
+
+  it("the delete dialog says so when the project has no tasks", async () => {
+    renderWorkspace(<ProjectTree />, workspace());
+    fireEvent.click(await screen.findByRole("button", { name: "Delete Beta" }));
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveAccessibleName("Delete Beta?");
+    expect(dialog).toHaveAccessibleDescription("This project has no tasks.");
+    expect(within(dialog).getByRole("button", { name: "Yes, delete Beta" })).toBeInTheDocument();
+  });
+
+  it("Cancel closes the delete dialog without deleting", async () => {
+    const { mock } = renderWorkspace(<ProjectTree />, workspace());
+    fireEvent.click(await screen.findByRole("button", { name: "Delete Alpha" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(mock.calls.filter((c) => c.method === "DELETE")).toHaveLength(0);
   });
 });

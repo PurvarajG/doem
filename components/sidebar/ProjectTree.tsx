@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTasks } from "@/lib/store-context";
 import { PROJECT_COLORS, projectColorVar } from "@/lib/types";
+import { projectDeleteConsequence } from "@/lib/project-delete";
 import { readStoredKey } from "@/lib/storage-key";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
@@ -293,8 +294,10 @@ export default function ProjectTree() {
         role="alertdialog"
         open={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
-        title={`Delete "${pendingDelete?.name ?? ""}"?`}
-        description="Its tasks move to No project."
+        title={`Delete ${pendingDelete?.name ?? ""}?`}
+        description={projectDeleteConsequence(
+          pendingDelete ? tasks.filter((t) => t.projectId === pendingDelete.id).length : 0,
+        )}
         initialFocusRef={cancelRef}
         actions={
           <>
@@ -313,7 +316,7 @@ export default function ProjectTree() {
                 setPendingDelete(null);
               }}
             >
-              Delete
+              Yes, delete {pendingDelete?.name}
             </Button>
           </>
         }
