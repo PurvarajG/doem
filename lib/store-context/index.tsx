@@ -149,18 +149,12 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const completeTask = useCallback(
     async (id: string) => {
       const prior = getTasks().find((t) => t.id === id);
-      const { ok, next } = await rawComplete(id);
+      const { ok } = await rawComplete(id);
       if (!ok) return;
       offerUndo("Marked done", async () => {
+        // The server removes the next occurrence if nobody has started it, and
+        // reopenTask refetches the list, so the copy drops out of local state.
         await reopenTask(id);
-        if (next) {
-          try {
-            await request(`/api/tasks/${next.id}/forever`, { method: "DELETE" });
-            setTasks((prev) => prev.filter((t) => t.id !== next.id));
-          } catch (error) {
-            onError((error as Error).message);
-          }
-        }
         if (prior?.stageId) {
           const current = getTasks().find((t) => t.id === id);
           if (current && (current.stageId !== prior.stageId || current.boardOrder !== prior.boardOrder)) {
@@ -169,7 +163,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         }
       });
     },
-    [rawComplete, reopenTask, rawMove, offerUndo, setTasks, getTasks, onError],
+    [rawComplete, reopenTask, rawMove, offerUndo, getTasks],
   );
 
   const trashTask = useCallback(

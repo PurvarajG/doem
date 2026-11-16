@@ -4,6 +4,9 @@ import type { Tx } from "../db";
 import { DEFAULT_STAGES, type ProjectStage, type StageInput, type StageKind } from "../types";
 import { Invalid } from "../validate";
 import { db, rowToStage, type Q, type StageRow } from "./rows";
+// tasks.ts imports this file too. Both only call each other's functions at
+// run time, never at import time, so the cycle is safe.
+import { finishTask, releaseSuccessors } from "./tasks";
 
 /** Thrown when a request would break a board invariant; APIs map it to 409. */
 export class StageConflict extends Error {}
@@ -50,12 +53,20 @@ export async function doneStageOf(q: Q, projectId: string): Promise<ProjectStage
   return rows.length ? rowToStage(rows[0]) : null;
 }
 
-/** Where a task lands when it is created, or reopened out of Done. */
-export async function firstOpenStageOf(q: Q, projectId: string): Promise<ProjectStage | null> {
+/**
+ * Where a task lands when it is created, or reopened out of Done. `excludeId`
+ * skips a column that is about to be deleted.
+ */
+export async function firstOpenStageOf(
+  q: Q,
+  projectId: string,
+  excludeId?: string,
+): Promise<ProjectStage | null> {
   const rows = await q.query<StageRow>(
     `select * from project_stages where project_id = $1 and kind <> 'done'
+        and ($2::uuid is null or id <> $2::uuid)
       order by sort_order asc, created_at asc limit 1`,
-    [projectId],
+    [projectId, excludeId ?? null],
   );
   return rows.length ? rowToStage(rows[0]) : null;
 }
@@ -78,12 +89,24 @@ export async function addStage(projectId: string, input: StageInput): Promise<Pr
     if (input.kind === "done" && (await doneStageOf(tx, projectId))) {
       throw new StageConflict("This project already has a done column");
     }
+    // A new lane goes before Done, so Done stays the last lane. A done lane
+    // itself (a project that has none) is appended.
+    const done = input.kind === "done" ? null : await doneStageOf(tx, projectId);
+    if (done) {
+      await tx.query(
+        `update project_stages set sort_order = sort_order + 1
+          where project_id = $1 and sort_order >= $2`,
+        [projectId, done.sortOrder],
+      );
+    }
     const rows = await tx.query<StageRow>(
       `insert into project_stages (id, project_id, name, kind, sort_order)
        values ($1,$2,$3,$4,
-         coalesce((select max(sort_order)+1 from project_stages where project_id=$2), 0))
+         ${done ? "$5" : "coalesce((select max(sort_order)+1 from project_stages where project_id=$2), 0)"})
        returning *`,
-      [randomUUID(), projectId, input.name, input.kind],
+      done
+        ? [randomUUID(), projectId, input.name, input.kind, done.sortOrder]
+        : [randomUUID(), projectId, input.name, input.kind],
     );
     return rowToStage(rows[0]);
   });
@@ -194,41 +217,97 @@ export async function removeStage(id: string, destinationId: string): Promise<bo
   });
 }
 
-/** Shared by stage removal and project deletion: relocate tasks, fixing status. */
+/**
+ * Shared by stage removal and project deletion: relocate tasks, fixing status.
+ * Open tasks moving into a done lane are completed through the same path as
+ * the checkbox (so recurring ones spawn their next occurrence); done tasks
+ * moving out are reopened. Trashed tasks keep their status.
+ */
 export async function moveTasksToStage(
   tx: Tx,
   fromStageId: string,
   destination: ProjectStage,
 ): Promise<void> {
+  if (fromStageId === destination.id) return;
+
   // The large offset parks incoming tasks behind whatever is already in the
   // destination; renumberStage then collapses both groups back to 0..n-1.
-  const statusFix =
-    destination.kind === "done"
-      ? `status = case when status = 'trashed' then status else 'done' end,
-         completed_at = case when status = 'trashed' then completed_at
-                             else coalesce(completed_at, now()) end`
-      : `status = case when status = 'done' then 'open' else status end,
-         completed_at = case when status = 'done' then null else completed_at end`;
+  const park = (extra: string, where: string) =>
+    tx.query(
+      `update tasks
+          set stage_id = $2, board_order = board_order + 1000000,
+              stage_entered_at = now()${extra}
+        where stage_id = $1 and ${where}`,
+      [fromStageId, destination.id],
+    );
 
-  await tx.query(
-    `update tasks
-        set stage_id = $2, board_order = board_order + 1000000,
-            stage_entered_at = now(), ${statusFix}
-      where stage_id = $1 and stage_id <> $2`,
-    [fromStageId, destination.id],
-  );
+  if (destination.kind === "done") {
+    const open = await tx.query<{ id: string }>(
+      `select id from tasks where stage_id = $1 and status = 'open'
+        order by board_order asc, created_at asc`,
+      [fromStageId],
+    );
+    await park("", `status <> 'open'`);
+    // A new occurrence must not land in the lane that is about to disappear.
+    for (const { id } of open) await finishTask(tx, id, { avoidStageId: fromStageId });
+  } else {
+    const reopened = await tx.query<{ id: string }>(
+      `select id from tasks where stage_id = $1 and status = 'done'`,
+      [fromStageId],
+    );
+    await park(
+      `, status = case when status = 'done' then 'open' else status end,
+         completed_at = case when status = 'done' then null else completed_at end`,
+      "true",
+    );
+    for (const { id } of reopened) await releaseSuccessors(tx, id);
+  }
   await renumberStage(tx, destination.id);
+  await renumberStage(tx, fromStageId);
 }
 
-/** Collapses a column's board_order back to a dense 0..n-1 in its current order. */
+/**
+ * Collapses a column's board_order back to a dense 0..n-1 in its current order.
+ * Trashed tasks are not on the board, so they are not counted.
+ */
 export async function renumberStage(tx: Tx, stageId: string): Promise<void> {
   await tx.query(
     `update tasks t set board_order = o.rn - 1
        from (
          select id, row_number() over (order by board_order asc, created_at asc) as rn
-           from tasks where stage_id = $1
+           from tasks where stage_id = $1 and status <> 'trashed'
        ) o
       where t.id = o.id`,
     [stageId],
+  );
+}
+
+/**
+ * Puts `taskId` at `index` among the column's non-trashed tasks (the order the
+ * board renders), default the end, and rewrites board_order densely. The task's
+ * stage_id must already be `stageId`.
+ */
+export async function placeInStage(
+  tx: Tx,
+  stageId: string,
+  taskId: string,
+  index?: number,
+): Promise<void> {
+  const rows = await tx.query<{ id: string }>(
+    `select id from tasks where stage_id = $1 and status <> 'trashed' and id <> $2
+      order by board_order asc, created_at asc`,
+    [stageId, taskId],
+  );
+  const ids = rows.map((r) => r.id);
+  const at =
+    index === undefined || !Number.isFinite(index)
+      ? ids.length
+      : Math.max(0, Math.min(Math.floor(index), ids.length));
+  ids.splice(at, 0, taskId);
+  await tx.query(
+    `update tasks t set board_order = o.ord - 1
+       from unnest($1::uuid[]) with ordinality as o(id, ord)
+      where t.id = o.id`,
+    [ids],
   );
 }
