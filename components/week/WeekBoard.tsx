@@ -50,6 +50,7 @@ export default function WeekBoard({ rows, carried, planIts, todayISO, onPlanIt }
 
   return (
     <div
+      data-tour="week"
       ref={scrollRef}
       onScroll={measure}
       data-fade={fade}

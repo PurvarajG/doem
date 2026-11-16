@@ -44,7 +44,7 @@ export default function TrackingKpis({
       : `-${fmtHours(lastWeek - thisWeek)}`;
 
   return (
-    <div className="grid grid-cols-2 gap-4 rail:grid-cols-4">
+    <div data-tour="tracking-kpis" className="grid grid-cols-2 gap-4 rail:grid-cols-4">
       <Kpi
         label="This week"
         value={nowrap(fmtHours(thisWeek))}

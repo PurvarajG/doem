@@ -1,8 +1,9 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import ProjectSettings from "@/components/ProjectSettings";
-import { emptyWorkspace, makeProject, makeTask, renderWorkspace } from "./harness";
+import { projectDeleteConsequence } from "@/lib/project-delete";
+import { emptyWorkspace, makeProject, makeStages, makeTask, renderWorkspace } from "./harness";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -48,6 +49,19 @@ describe("ProjectSettings", () => {
     );
   });
 
+  test("has a Lanes section listing the project's lanes with their actions", async () => {
+    const stages = makeStages(project.id);
+    const onClose = vi.fn();
+    renderWorkspace(
+      <ProjectSettings project={project} onClose={onClose} />,
+      emptyWorkspace({ projects: [project], stages }),
+    );
+    const section = (await screen.findByRole("heading", { name: "Lanes" })).closest("section")!;
+    expect(within(section).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(section).getByRole("button", { name: "Rename Backlog" })).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "Add lane" })).toBeInTheDocument();
+  });
+
   test("archived switch flips", async () => {
     const { mock } = setup();
     const sw = await screen.findByRole("switch", { name: "Archived" });
@@ -62,7 +76,10 @@ describe("ProjectSettings", () => {
     const { mock, onClose } = setup();
     await userEvent.click(await screen.findByRole("button", { name: "Delete this project" }));
     const dialog = screen.getByRole("alertdialog", { name: "Delete Website?" });
-    expect(dialog).toHaveAccessibleDescription(/1 task keeps existing/);
+    expect(dialog).toHaveAccessibleDescription(projectDeleteConsequence(1));
+    expect(projectDeleteConsequence(1)).toBe(
+      "1 task keeps existing, but it moves to no project and loses its column.",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(mock.calls.some((c) => c.method === "DELETE")).toBe(false);

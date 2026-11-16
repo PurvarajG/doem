@@ -36,9 +36,10 @@ export async function addProject(
   });
 }
 
+/** An archived project never matches, so `#name` makes a fresh project rather than filing into one the user can't see. */
 export async function findOrCreateProjectByName(name: string): Promise<Project> {
   const existing = await db.query<ProjectRow>(
-    `select * from projects where lower(name) = lower($1) limit 1`,
+    `select * from projects where lower(name) = lower($1) and not archived limit 1`,
     [name],
   );
   if (existing.length) return rowToProject(existing[0]);

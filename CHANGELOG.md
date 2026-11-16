@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.3] - 2026-11-16
+
+### Added
+- An in-app tour of how Doem is meant to be used: catch tasks in the Inbox, give them a day, plan the week, commit on Today, time the work, wrap up, and review in Tracking. It runs on your real pages, lights up each part it explains, and three steps let you try it (add a task, commit to one, start or stop the timer). Start it from What's new or the profile menu (Take the tour).
+- What's new opens once after this update with the list of changes below, and again from the profile menu.
+- Project settings manages lanes: rename, reorder, limit, retype or remove a lane. New lanes go before Done.
+- Settings lists archived projects with Un-archive.
+- The README and the release page show the Terminal command for when macOS says the unsigned app is damaged: `xattr -cr "/Applications/Doem.app"`.
+
+### Changed
+- Adding a task to a lane no longer schedules it for today. Type a day, like tomorrow, to date it.
+- The Inbox holds only unsorted tasks. A project task with no date is that project's backlog.
+- Deleting a project from the sidebar says how many tasks lose their project, the same as Settings.
+- `#name` in quick add no longer matches archived projects.
+
+### Fixed
+- Moving a card down its own lane, or after trashing one, put it a slot off.
+- A repeating task finished by dragging it to Done or changing its lane did not create the next one. Reopening a task now takes back its next one if it hasn't been started.
+- Restoring a finished task from Trash brought it back open. It comes back finished, in Done.
+- Multi-day tasks showed only on their first day in Next 7 days. They show on every day they span and count once.
+- Switching a repeat from every 2 weeks to monthly dropped the interval. It keeps every 2.
+- Removing a lane left its tasks showing in the old lane until a reload.
+
+### Known issues
+- On Today, a task row's hover buttons cover its commit target, so committing with the mouse doesn't work there. Point at the task and press `*`.
+- Reopening a repeating task removes its unstarted next one, including any subtasks you added to that next one.
+- Un-archiving a project whose name was reused leaves two active projects with the same name.
+
 ## [1.0.2] - 2026-11-15
 
 ### Added

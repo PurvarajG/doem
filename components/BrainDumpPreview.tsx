@@ -19,7 +19,7 @@ export function chipClass(tone?: "accent"): string {
 /** The chips a parsed line shows, plus the unmatched #project name (if any). */
 export function parsedChips(
   p: ParsedQuickAdd,
-  projects: { name: string }[],
+  projects: { name: string; archived?: boolean }[],
 ): { chips: Chip[]; unknownProject: string | null } {
   const today = toISODate(new Date());
   const chips: Chip[] = [];
@@ -31,7 +31,7 @@ export function parsedChips(
   if (p.priority) chips.push({ key: "prio", text: PRIORITY_NAME[p.priority] });
   let unknownProject: string | null = null;
   if (p.projectName) {
-    const match = projects.find((pr) => pr.name.toLowerCase() === p.projectName!.toLowerCase());
+    const match = projects.find((pr) => !pr.archived && pr.name.toLowerCase() === p.projectName!.toLowerCase());
     if (match) chips.push({ key: "project", text: match.name });
     else unknownProject = p.projectName;
   }

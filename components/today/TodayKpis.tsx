@@ -48,7 +48,7 @@ export default function TodayKpis({
   }, 0);
 
   return (
-    <div className="grid grid-cols-2 gap-4 rail:grid-cols-4">
+    <div data-tour="today-kpis" className="grid grid-cols-2 gap-4 rail:grid-cols-4">
       <Kpi
         label="Planned"
         value={<span className="whitespace-nowrap">{fmt(cap.plannedMinutes)}</span>}

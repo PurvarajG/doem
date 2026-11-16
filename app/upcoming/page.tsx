@@ -88,7 +88,7 @@ function Upcoming() {
             onPlanIt={(task: Task, date: string) => void rescheduleTasks([task.id], date)}
           />
         ) : (
-          <div className="flex flex-col gap-3">
+          <div data-tour="week" className="flex flex-col gap-3">
             <CarriedRow tasks={view.carried} todayISO={todayISO} />
             {view.rows.map((row, i) => (
               <DayRow

@@ -43,4 +43,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # Put ahead of the generated notes. Doem is unsigned, so a downloaded
+          # copy can be refused as "damaged" until the quarantine flag is cleared.
+          body: |
+            ## Install
+
+            Download `Doem-latest-arm64.dmg`, open it and drag Doem into Applications. The first time, right-click Doem and choose **Open**.
+
+            If macOS says Doem "is damaged and can't be opened", open Terminal, run this, then open Doem again:
+
+            ```bash
+            xattr -cr "/Applications/Doem.app"
+            ```
           files: dist-electron/Doem-latest-arm64.dmg

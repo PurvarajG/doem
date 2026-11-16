@@ -32,6 +32,12 @@ test("sort both ways, ties keep store order", () => {
   assert.deepEqual(inboxTasks([a, b, c, sched], today, "newest").map((t) => t.id), [a.id, c.id, b.id]);
 });
 
+test("an undated project task is backlog, not in the inbox", () => {
+  const free = task({}), filed = task({ projectId: "p1" });
+  assert.deepEqual(inboxTasks([free, filed], today, "oldest").map((t) => t.id), [free.id]);
+  assert.equal(inboxStats([free, filed], today).count, 1);
+});
+
 test("age and labels", () => {
   assert.equal(ageLabel(task({ ago: 0 }), today), "Added today");
   assert.equal(ageLabel(task({ ago: 1 }), today), "Added yesterday");

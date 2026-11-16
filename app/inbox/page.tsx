@@ -58,13 +58,17 @@ export default function InboxPage() {
       }
     >
       <div className="flex min-w-0 flex-col gap-4">
-        <QuickAdd
-          id="doem-inbox-quick-add"
-          defaultScheduled={null}
-          autoFocus={false}
-          placeholder="Add to the inbox. No day needed."
-        />
-        <InboxList tasks={inbox} todayISO={todayISO} ready={known} />
+        <div data-tour="inbox-add">
+          <QuickAdd
+            id="doem-inbox-quick-add"
+            defaultScheduled={null}
+            autoFocus={false}
+            placeholder="Add to the inbox. No day needed."
+          />
+        </div>
+        <div data-tour="inbox-list">
+          <InboxList tasks={inbox} todayISO={todayISO} ready={known} />
+        </div>
       </div>
     </PageHead>
   );

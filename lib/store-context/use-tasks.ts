@@ -91,6 +91,18 @@ export function useTasksState(
     [onError, onStagesCreated, projects, setTasks],
   );
 
+  /**
+   * Replaces the list with the server's. The save it follows already worked, so
+   * a failed refresh keeps the local state rather than reporting an error.
+   */
+  const refreshTasks = useCallback(async () => {
+    try {
+      setTasks(await request<Task[]>("/api/tasks"));
+    } catch {
+      // Keep what we have; the next load catches up.
+    }
+  }, [setTasks]);
+
   const patchTask = useCallback(
     async (id: string, patch: Partial<TaskInput>) => {
       let before: Task[] = [];
@@ -104,6 +116,9 @@ export function useTasksState(
           body: JSON.stringify(patch),
         });
         setTasks((prev) => prev.map((t) => (t.id === id ? saved : t)));
+        // Finishing or reopening can create or remove a recurring task's next
+        // occurrence on the server, so take its list wholesale.
+        if (saved.status !== before.find((t) => t.id === id)?.status) await refreshTasks();
         return true;
       } catch (error) {
         setTasks(before);
@@ -111,7 +126,7 @@ export function useTasksState(
         return false;
       }
     },
-    [onError, setTasks],
+    [onError, setTasks, refreshTasks],
   );
 
   /**
@@ -185,6 +200,9 @@ export function useTasksState(
       try {
         const saved = await request<Task>(`/api/tasks/${id}/reopen`, { method: "POST" });
         setTasks((prev) => prev.map((t) => (t.id === id ? saved : t)));
+        // The server removes the task's unstarted next occurrence, so a task
+        // that was done may have taken a copy with it.
+        if (before.find((t) => t.id === id)?.status === "done") await refreshTasks();
         return true;
       } catch (error) {
         setTasks(before);
@@ -192,7 +210,7 @@ export function useTasksState(
         return false;
       }
     },
-    [onError, setTasks],
+    [onError, setTasks, refreshTasks],
   );
 
   const trashTask = useCallback(

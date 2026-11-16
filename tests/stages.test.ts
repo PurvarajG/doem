@@ -204,3 +204,71 @@ test("wipCount counts only open tasks in the given stage", () => {
   assert.equal(wipCount(tasks, "b"), 1);
   assert.equal(wipCount(tasks, "zzz"), 0);
 });
+
+test("a new column goes before Done, with dense unique sort orders", async () => {
+  const { project: p, stages } = await project("Before done");
+
+  const review = await db.store.addStage(p.id, { name: "Review", kind: "active" });
+  assert.equal(review.name, "Review");
+  const qa = await db.store.addStage(p.id, { name: "QA", kind: "active" });
+
+  const after = await db.store.listStages(p.id);
+  assert.deepEqual(after.map((s) => s.name), [
+    "Backlog",
+    "In Progress",
+    "Blocked",
+    "Review",
+    "QA",
+    "Done",
+  ]);
+  assert.deepEqual(after.map((s) => s.sortOrder), [0, 1, 2, 3, 4, 5]);
+  assert.equal(after.at(-1)?.id, stages[3].id);
+  assert.equal(after.find((s) => s.id === qa.id)?.sortOrder, 4);
+});
+
+test("a project without a done column appends a new column", async () => {
+  const { project: p } = await project("No done");
+  await withTransaction((tx) =>
+    tx.query(`delete from project_stages where project_id = $1 and kind = 'done'`, [p.id]),
+  );
+  const added = await db.store.addStage(p.id, { name: "Last", kind: "active" });
+  assert.equal(added.sortOrder, 3);
+  const done = await db.store.addStage(p.id, { name: "Finished", kind: "done" });
+  assert.equal(done.sortOrder, 4);
+});
+
+test("removing a column into Done completes each open task and spawns one next occurrence", async () => {
+  const { project: p, stages } = await project("Remove into done");
+  const plain = await task(p.id, "Plain", stages[1].id);
+  const repeating = await db.store.addTask({
+    title: "Remove weekly",
+    projectId: p.id,
+    stageId: stages[1].id,
+    scheduled: "2026-03-01",
+    minutes: 30,
+    priority: 0,
+    recurrence: { freq: "weekly", interval: 1 },
+  });
+  const trashed = await task(p.id, "In the bin", stages[1].id);
+  await db.store.trashTask(trashed.id);
+
+  await db.store.removeStage(stages[1].id, stages[3].id);
+
+  const all = await db.store.allTasks();
+  assert.equal(all.find((t) => t.id === plain.id)?.status, "done");
+  assert.equal(all.find((t) => t.id === repeating.id)?.status, "done");
+  assert.equal(all.find((t) => t.id === repeating.id)?.stageId, stages[3].id);
+  const next = all.filter((t) => t.title === "Remove weekly" && t.id !== repeating.id);
+  assert.equal(next.length, 1, "exactly one next occurrence");
+  assert.equal(next[0].status, "open");
+  assert.equal(next[0].stageId, stages[0].id, "it does not land in the lane that was removed");
+  assert.equal((await db.store.getTask(trashed.id))?.status, "trashed");
+
+  const doneLane = all
+    .filter((t) => t.stageId === stages[3].id)
+    .sort((a, b) => a.boardOrder - b.boardOrder);
+  assert.deepEqual(
+    doneLane.filter((t) => t.status !== "trashed").map((t) => t.boardOrder),
+    doneLane.filter((t) => t.status !== "trashed").map((_, i) => i),
+  );
+});
