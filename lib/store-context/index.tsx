@@ -197,6 +197,24 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     [upsertTask, offerUndo, rawTrash, onError],
   );
 
+  const { removeStage: rawRemoveStage } = stages;
+  const removeStage = useCallback(
+    async (id: string, moveTo: string) => {
+      // A failed removal throws out of here before anything is refetched.
+      await rawRemoveStage(id, moveTo);
+      // The server moved the lane's tasks (completing them in a Done lane, which
+      // can spawn a recurring task's next occurrence), so take its list
+      // wholesale. The removal itself succeeded, so a failed read keeps local
+      // state rather than throwing.
+      try {
+        setTasks(await request<Task[]>("/api/tasks"));
+      } catch {
+        // Keep what we have; the next load catches up.
+      }
+    },
+    [rawRemoveStage, setTasks],
+  );
+
   const patchTask = useCallback(
     async (id: string, patch: Partial<TaskInput>) => {
       const prior = getTasks().find((t) => t.id === id);
@@ -376,6 +394,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       rescheduleTasks,
       ...undoApi,
       ...stages,
+      removeStage,
       ...note,
       ...quickTodos,
       ...time,
@@ -401,6 +420,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       rescheduleTasks,
       undoApi,
       stages,
+      removeStage,
       note,
       quickTodos,
       time,
