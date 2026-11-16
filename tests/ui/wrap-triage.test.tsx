@@ -34,6 +34,21 @@ describe("InboxTriage", () => {
     expect(screen.getByText("Give each a day or trash it")).toBeTruthy();
   });
 
+  it("does not list an undated project task", async () => {
+    renderWorkspace(
+      <InboxTriage todayISO={today} />,
+      emptyWorkspace({
+        tasks: [
+          makeTask({ id: A, title: "Sort receipts", scheduled: null }),
+          makeTask({ id: B, title: "Backlog item", scheduled: null, projectId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" }),
+        ],
+      }),
+    );
+    expect(await screen.findByText("Sort receipts")).toBeTruthy();
+    expect(screen.queryByText("Backlog item")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Inbox", level: 2 }).nextElementSibling?.textContent).toBe("1");
+  });
+
   it("shows the empty line when nothing is undated", async () => {
     renderWorkspace(
       <InboxTriage todayISO={today} />,

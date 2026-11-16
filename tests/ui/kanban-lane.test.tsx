@@ -86,6 +86,7 @@ describe("kanban lane", () => {
       const post = mock.calls.find((c) => c.method === "POST" && c.url.includes("/api/tasks"));
       expect(post).toBeTruthy();
       expect(JSON.stringify(post)).toContain(active.id);
+      expect(post?.body).toMatchObject({ text: "Ship it", projectId: project.id, stageId: active.id, scheduled: null });
     });
   });
 
