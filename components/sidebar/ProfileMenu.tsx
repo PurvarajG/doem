@@ -8,6 +8,7 @@ import { useTheme, type Theme } from "@/components/ThemeToggle";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import { usePickerMenu } from "@/lib/usePickerMenu";
 import { openWhatsNew } from "@/lib/whats-new";
+import { startTour } from "@/lib/tour";
 
 const MIN_WIDTH = 200;
 const THEME_ORDER: Theme[] = ["system", "light", "dark"];
@@ -45,6 +46,7 @@ export default function ProfileMenu() {
       },
       { id: "shortcuts", label: "Shortcuts", icon: "today", onSelect: () => setShortcutsOpen(true) },
       { id: "whats-new", label: "What's new", icon: "flag", onSelect: openWhatsNew },
+      { id: "tour", label: "Take the tour", icon: "play", onSelect: () => startTour() },
     ],
     [router, theme, setTheme],
   );

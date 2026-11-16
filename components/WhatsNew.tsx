@@ -13,6 +13,7 @@ import {
   markWhatsNewSeen,
   type WhatsNewTarget,
 } from "@/lib/whats-new";
+import { startTour } from "@/lib/tour";
 
 /**
  * "What's new" sheet. Opens by itself once per WHATS_NEW_VERSION, and again
@@ -56,9 +57,18 @@ export default function WhatsNew() {
       title="What's new"
       description="Projects and boards now behave the way they look."
       actions={
-        <Button variant="primary" onClick={close}>
-          Got it
-        </Button>
+        <>
+          <Button onClick={close}>Got it</Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              close();
+              startTour();
+            }}
+          >
+            Take the tour
+          </Button>
+        </>
       }
     >
       <div className="-mt-4 max-h-[60vh] overflow-y-auto">

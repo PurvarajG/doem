@@ -84,7 +84,7 @@ function Project() {
       subtitle={`${summary.open} open ${summary.open === 1 ? "task" : "tasks"} across ${lanes} ${lanes === 1 ? "lane" : "lanes"}.`}
       actions={
         <>
-          <Button variant="ghost" onClick={() => setSettingsOpen(true)}>
+          <Button variant="ghost" data-tour="project-settings" onClick={() => setSettingsOpen(true)}>
             Settings
           </Button>
           <Segmented<ProjectView>
@@ -102,11 +102,13 @@ function Project() {
       <div className="flex flex-col gap-6">
         <ProjectSummaryCard summary={summary} leftToPlan={leftToPlan} carriedOver={carried} />
         <GoneQuietLine tasks={quiet} />
-        {view === "list" ? (
-          <ProjectList project={project} todayISO={todayISO} />
-        ) : (
-          <Board project={project} todayISO={todayISO} />
-        )}
+        <div data-tour="board" className="min-w-0">
+          {view === "list" ? (
+            <ProjectList project={project} todayISO={todayISO} />
+          ) : (
+            <Board project={project} todayISO={todayISO} />
+          )}
+        </div>
       </div>
 
       {settingsOpen && <ProjectSettings project={project} onClose={() => setSettingsOpen(false)} />}

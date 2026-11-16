@@ -81,4 +81,16 @@ describe("WhatsNew", () => {
     await user.click(screen.getByRole("button", { name: "Show me: Archived projects have a home" }));
     expect(push).toHaveBeenCalledWith("/settings#projects");
   });
+
+  test("Take the tour closes the sheet and starts the walkthrough", async () => {
+    const user = userEvent.setup();
+    const heard = vi.fn();
+    window.addEventListener("doem:tour", heard);
+    render(<WhatsNew />);
+    await user.click(screen.getByRole("button", { name: "Take the tour" }));
+    window.removeEventListener("doem:tour", heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(store.get(WHATS_NEW_SEEN_KEY)).toBe(WHATS_NEW_VERSION);
+  });
 });

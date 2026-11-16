@@ -48,7 +48,7 @@ describe("ProfileMenu", () => {
     expect(screen.getByText("You")).toBeInTheDocument();
   });
 
-  test("click opens a menu with six items in order", async () => {
+  test("click opens a menu with seven items in order", async () => {
     const { row } = await openMenu();
     expect(row).toHaveAttribute("aria-expanded", "true");
     const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
@@ -59,6 +59,7 @@ describe("ProfileMenu", () => {
       "Theme: Auto",
       "Shortcuts",
       "What's new",
+      "Take the tour",
     ]);
   });
 
@@ -94,6 +95,16 @@ describe("ProfileMenu", () => {
     await user.click(screen.getByRole("menuitem", { name: "What's new" }));
     window.removeEventListener("doem:whats-new", heard);
     expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  test("Take the tour starts the walkthrough from the top", async () => {
+    const { user } = await openMenu();
+    const heard = vi.fn();
+    window.addEventListener("doem:tour", heard);
+    await user.click(screen.getByRole("menuitem", { name: "Take the tour" }));
+    window.removeEventListener("doem:tour", heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect((heard.mock.calls[0][0] as CustomEvent).detail ?? null).toBeNull();
   });
 
   test("Escape closes the menu and returns focus to the row", async () => {

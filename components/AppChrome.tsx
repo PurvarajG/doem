@@ -13,6 +13,7 @@ import UndoBar from "./ui/UndoBar";
 import DesktopBridge from "./DesktopBridge";
 import CommandPalette from "./CommandPalette";
 import KeyboardShortcuts from "./KeyboardShortcuts";
+import Tour from "./Tour";
 import WhatsNew from "./WhatsNew";
 import { readStoredKey } from "@/lib/storage-key";
 import { useDensity } from "./useDensity";
@@ -98,6 +99,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       <CommandPalette />
       <KeyboardShortcuts />
       <WhatsNew />
+      <Tour />
     </TasksProvider>
   );
 }
