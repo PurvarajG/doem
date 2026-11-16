@@ -42,4 +42,3 @@ Tick each box only after seeing the "pass" result.
 4. Tag the merge commit `v1.0.0` and push the tag.
 5. Check the release workflow (`.github/workflows/release.yml`) finished green and the release has the DMG attached.
 6. Check the download link on the release page: download the DMG, confirm the size and that it opens, then run the install and first-open checks above on it.
-7. Deploy the site last, once the download link works, so the site never points at a missing file.

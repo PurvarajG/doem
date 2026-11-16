@@ -227,6 +227,10 @@ alter table tasks add column if not exists start_on date;
 alter table tasks add column if not exists expires_on date;
 alter table tasks add column if not exists stage_entered_at timestamptz;
 
+-- The task a recurring occurrence was spawned from, so reopening the source can
+-- remove its unstarted successor. Not exposed on the Task type or the API.
+alter table tasks add column if not exists recurs_from uuid references tasks(id) on delete set null;
+
 -- "blocker_id blocks blocked_id". Deleting either task removes the link.
 create table if not exists task_links (
   blocker_id uuid references tasks(id) on delete cascade,

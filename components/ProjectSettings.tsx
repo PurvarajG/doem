@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTasks } from "@/lib/store-context";
+import { projectDeleteConsequence } from "@/lib/project-delete";
 import { PROJECT_COLORS, projectColorVar, type Project } from "@/lib/types";
 import SidePanel from "./ui/SidePanel";
 import { Field, SavingInput } from "./ui/Field";
@@ -12,6 +13,7 @@ import Button from "./ui/Button";
 import Caption from "./ui/Caption";
 import CategoryPicker from "./tracking/CategoryPicker";
 import { BOARD_TEMPLATES, templateSummary } from "@/lib/board-templates";
+import LaneManager from "./kanban/LaneManager";
 
 /**
  * Reached from an explicit Settings action in the project header, rather than
@@ -64,12 +66,7 @@ export default function ProjectSettings({
 
   const affected = tasks.filter((t) => t.projectId === project.id).length;
 
-  const consequence =
-    affected === 0
-      ? "This project has no tasks."
-      : `${affected} ${affected === 1 ? "task keeps" : "tasks keep"} existing, but ${
-          affected === 1 ? "it moves" : "they move"
-        } to no project and lose their column.`;
+  const consequence = projectDeleteConsequence(affected);
 
   return (
     <SidePanel open onClose={onClose} title="Project settings">
@@ -122,6 +119,17 @@ export default function ProjectSettings({
               </option>
             ))}
           </select>
+        </Field>
+
+        <Field label="Timer category">
+          <CategoryPicker
+            categories={categories}
+            value={project.defaultCategoryId}
+            onChange={(categoryId) => updateProject(project.id, { defaultCategoryId: categoryId })}
+          />
+          <p className="mt-1 text-meta text-ink-3">
+            Starting a timer on one of this project&apos;s tasks lands here instead of Focus Work.
+          </p>
         </Field>
 
         <Field label="Board template" htmlFor="project-template">
@@ -215,16 +223,7 @@ export default function ProjectSettings({
           )}
         </Field>
 
-        <Field label="Timer category">
-          <CategoryPicker
-            categories={categories}
-            value={project.defaultCategoryId}
-            onChange={(categoryId) => updateProject(project.id, { defaultCategoryId: categoryId })}
-          />
-          <p className="mt-1 text-meta text-ink-3">
-            Starting a timer on one of this project&apos;s tasks lands here instead of Focus Work.
-          </p>
-        </Field>
+        <LaneManager project={project} />
 
         <div className="flex items-center justify-between gap-4 rounded-row px-4 py-3 inset-ring-1 inset-ring-line">
           <div>

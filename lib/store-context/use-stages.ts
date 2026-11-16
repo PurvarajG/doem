@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { ProjectStage, StageInput } from "../types";
+import type { ProjectStage, StageInput, StageKind } from "../types";
 import { request } from "./request";
 
 export type StagesApi = {
@@ -14,7 +14,10 @@ export type StagesApi = {
   reorderStages: (projectId: string, ids: string[]) => Promise<void>;
   removeStage: (id: string, moveTo: string) => Promise<void>;
   /** Patches a stage; `wipLimit: null` clears the limit. */
-  updateStage: (id: string, patch: { name?: string; wipLimit?: number | null }) => Promise<void>;
+  updateStage: (
+    id: string,
+    patch: { name?: string; kind?: StageKind; wipLimit?: number | null },
+  ) => Promise<void>;
 };
 
 export function useStages(onError: (message: string) => void): StagesApi {
@@ -32,17 +35,29 @@ export function useStages(onError: (message: string) => void): StagesApi {
   // duplicate on retry or strand the tasks it was supposed to carry.
   const addStage = useCallback(
     async (projectId: string, input: StageInput) => {
+      let created: ProjectStage;
       try {
-        const created = await request<ProjectStage>(`/api/projects/${projectId}/stages`, {
+        created = await request<ProjectStage>(`/api/projects/${projectId}/stages`, {
           method: "POST",
           body: JSON.stringify(input),
         });
-        setStages((prev) => [...prev, created]);
-        return created;
       } catch (error) {
         onError((error as Error).message);
         return null;
       }
+      // The server may have shifted other lanes (a new lane lands before Done),
+      // so take its order for the project. If that read fails the new lane is
+      // still shown, appended.
+      try {
+        const fresh = await request<ProjectStage[]>(`/api/projects/${projectId}/stages`);
+        if (!Array.isArray(fresh) || !fresh.some((s) => s.id === created.id)) {
+          throw new Error("Stages could not be refreshed");
+        }
+        setStages((prev) => [...prev.filter((s) => s.projectId !== projectId), ...fresh]);
+      } catch {
+        setStages((prev) => [...prev, created]);
+      }
+      return created;
     },
     [onError],
   );

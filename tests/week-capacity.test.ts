@@ -304,3 +304,109 @@ test("planItFor skips hidden-until and blocked undated tasks", () => {
   const blocked = task({ id: "bl", scheduled: null, minutes: 20, blockedBy: ["blk"] });
   assert.equal(planItFor([blocker, hidden, blocked], row({ freeMinutes: 60 }), T0, NOW, null), null);
 });
+
+// ---- multi-day tasks span every day of their range ----
+const span = (overrides: Partial<Task>) => task({ isComplex: true, ...overrides });
+const ids = (r: { tasks: Task[] }) => r.tasks.map((t) => t.id);
+
+test("weekRows shows a complex task on each future day of its span and adds its minutes to each", () => {
+  const tasks = [span({ id: "s", scheduled: d(2), finishDate: d(4), minutes: 120 })];
+  const rows = weekRows(tasks, T0, NOW, SETTINGS);
+  for (const i of [2, 3, 4]) {
+    assert.deepEqual(ids(rows[i]), ["s"], `day ${i}`);
+    assert.equal(rows[i].plannedMinutes, 120);
+    assert.equal(rows[i].freeMinutes, 960 - 120);
+    assert.equal(rows[i].ratio, 120 / 960);
+  }
+  for (const i of [0, 1, 5, 6]) assert.deepEqual(ids(rows[i]), [], `day ${i}`);
+});
+
+test("weekRows shows a span that started yesterday today and on the following days", () => {
+  const tasks = [span({ id: "s", scheduled: d(-1), finishDate: d(2), minutes: 60 })];
+  const rows = weekRows(tasks, T0, NOW, SETTINGS);
+  assert.deepEqual([0, 1, 2, 3].map((i) => ids(rows[i])), [["s"], ["s"], ["s"], []]);
+  assert.equal(rows[1].plannedMinutes, 60);
+});
+
+test("weekRows stops a span that runs past today+6 at the last row", () => {
+  const tasks = [span({ id: "s", scheduled: d(5), finishDate: d(12), minutes: 30 })];
+  const rows = weekRows(tasks, T0, NOW, SETTINGS);
+  assert.equal(rows.length, 7);
+  assert.deepEqual([4, 5, 6].map((i) => ids(rows[i])), [[], ["s"], ["s"]]);
+});
+
+test("weekRows keeps a hidden-until complex task off the days before its start-on date", () => {
+  const tasks = [span({ id: "s", scheduled: d(1), finishDate: d(5), startOn: d(3), minutes: 30 })];
+  const rows = weekRows(tasks, T0, NOW, SETTINGS);
+  assert.deepEqual([1, 2, 3, 4, 5, 6].map((i) => ids(rows[i])), [[], [], ["s"], ["s"], ["s"], []]);
+});
+
+test("weekRows leaves non-complex tasks on their start day only, and ignores finishDate without isComplex", () => {
+  const tasks = [
+    task({ id: "n", scheduled: d(2), minutes: 30 }),
+    task({ id: "f", scheduled: d(2), finishDate: d(4), minutes: 30 }),
+  ];
+  const rows = weekRows(tasks, T0, NOW, SETTINGS);
+  assert.deepEqual(ids(rows[2]).sort(), ["f", "n"]);
+  assert.deepEqual(ids(rows[3]), []);
+});
+
+test("weekRows leaves a done spanning task out", () => {
+  const rows = weekRows([span({ scheduled: d(1), finishDate: d(3), status: "done" })], T0, NOW, SETTINGS);
+  assert.equal(rows.flatMap((r) => r.tasks).length, 0);
+});
+
+test("buildWeekPlan shows the same spans, including one that started before today", () => {
+  const tasks = [
+    span({ id: "a", scheduled: d(2), finishDate: d(4), minutes: 120 }),
+    span({ id: "b", scheduled: d(-1), finishDate: d(1), minutes: 45 }),
+    span({ id: "c", scheduled: d(5), finishDate: d(12), minutes: 30 }),
+    task({ id: "n", scheduled: d(3), minutes: 10 }),
+  ];
+  const week = buildWeekPlan(tasks, T0, SETTINGS);
+  assert.deepEqual(
+    week.map((w) => ids(w).sort()),
+    [["b"], ["b"], ["a"], ["a", "n"], ["a"], ["c"], ["c"]],
+  );
+  assert.deepEqual(week.map((w) => w.plannedMinutes), [45, 45, 120, 130, 120, 30, 30]);
+});
+
+test("buildWeekPlan leaves a complex task that ended before today out", () => {
+  const week = buildWeekPlan([span({ scheduled: d(-5), finishDate: d(-1) })], T0, SETTINGS);
+  assert.equal(week.flatMap((w) => w.tasks).length, 0);
+});
+
+test("weekMetrics counts a spanning task once for taskCount and plannedMinutes, but keeps per-day figures", () => {
+  const tasks = [
+    span({ id: "s", scheduled: d(1), finishDate: d(3), minutes: 100 }),
+    task({ id: "n", scheduled: d(1), minutes: 20 }),
+  ];
+  const week = buildWeekPlan(tasks, T0, SETTINGS);
+  const m = weekMetrics(tasks, T0, week);
+  assert.equal(m.taskCount, 2);
+  assert.equal(m.plannedMinutes, 120);
+  assert.equal(m.busiestDate, d(1));
+  assert.deepEqual(week.slice(1, 4).map((w) => w.plannedMinutes), [120, 100, 100]);
+});
+
+test("weekMetrics counts a span that started before today once", () => {
+  const tasks = [span({ id: "s", scheduled: d(-1), finishDate: d(2), minutes: 60 })];
+  const m = weekMetrics(tasks, T0, buildWeekPlan(tasks, T0, SETTINGS));
+  assert.equal(m.taskCount, 1);
+  assert.equal(m.plannedMinutes, 60);
+});
+
+test("weekHeadline counts a spanning task and its minutes once", () => {
+  const tasks = [
+    span({ id: "s", scheduled: d(1), finishDate: d(3), minutes: 100 }),
+    task({ id: "n", scheduled: d(2), minutes: 20 }),
+  ];
+  const rows = weekRows(tasks, T0, NOW, SETTINGS);
+  assert.equal(rows.flatMap((r) => r.tasks).length, 4);
+  assert.equal(weekHeadline(rows, 0), "2 tasks, 2h planned.");
+});
+
+test("weekHeadline counts a span that started before today once, today row included", () => {
+  const tasks = [span({ id: "s", scheduled: d(-1), finishDate: d(2), minutes: 60 })];
+  assert.equal(weekHeadline(weekRows(tasks, T0, NOW, SETTINGS), 0), "1 task, 1h planned.");
+});

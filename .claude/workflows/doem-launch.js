@@ -1,6 +1,6 @@
 export const meta = {
   name: 'doem-launch',
-  description: 'Get Doem ready to ship: freeze, clean the repo, README, website, update check, screenshots, tests, squashed release branch. Local only, nothing is pushed.',
+  description: 'Get Doem ready to ship: freeze, clean the repo, README, update check, screenshots, tests, squashed release branch. Local only, nothing is pushed.',
   whenToUse: 'Once, to take the rebrand/doem branch to a clean, tested release/<version> branch ready for the owner to push.',
   phases: [
     { title: 'Freeze', detail: 'archive the build record, back up all history, commit the staged rename' },
@@ -49,7 +49,7 @@ your training data, and its docs are in node_modules/next/dist/docs/.
 
 Hard rules:
 - Never push, never open or edit pull requests, releases, tags on GitHub, never rename the
-  GitHub repo, never deploy the website. Nothing leaves this machine.
+  GitHub repo. Nothing leaves this machine.
 - Never read, write, move or delete anything in ~/Library/Application Support/Doem,
   ~/Library/Application Support/Tempo or the Tempo-backup-* folders there. That is the
   owner's real data. Use PGLITE_DIR pointing at a scratch folder for any server you run.
@@ -197,7 +197,7 @@ steps below.
    exactly the index, nothing unstaged, with the message:
      chore: rename Tempo to Doem
      <blank line>
-     App, packaging, IPC channels, storage keys, brand assets, download site and docs.
+     App, packaging, IPC channels, storage keys, brand assets and docs.
      User data moves from Tempo to Doem on first launch (electron/user-data-migration.js).
      <blank line>
      Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -216,7 +216,7 @@ if (!freezeOk) {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 2: Build out. Six agents in parallel, each with its own files.
+// Phase 2: Build out. Five agents in parallel, each with its own files.
 // ---------------------------------------------------------------------------
 phase('Build out')
 
@@ -318,36 +318,6 @@ the Up next row can truncate its last meta item). Then a short entry each for 0.
 docs/media/README.md: one line saying the images are captured by scripts/screenshots.mjs.`,
   },
   {
-    key: 'website',
-    model: SONNET,
-    prompt: `Task: redesign the download website in site/ for the Doem brand and release ${VERSION}.
-
-You own: everything under site/ except site/dist/ (build output) and site/media/ (another
-agent puts screenshots there, with these exact names: ${MEDIA_NAMES}).
-
-Read first: site/index.html, site/styles.css, site/build.mjs, site/worker/, site/package.json,
-brand/doem/START-HERE.md, brand/doem/tokens.json, brand/doem-design-language.html and
-docs/design/v2/v2_design/ or rebuild/v2_design/ (whichever exists; the soft.html mockup is the
-app's visual language: soft glass, ink and indigo, Geist).
-
-Goal: one calm, confident product page that looks like it belongs to the app, not a template.
-- Hero: the doem lockup, one sentence, the Download for Mac button (keep the existing
-  releases/latest/download/Doem-latest-arm64.dmg link, but point it at github.com/${GH_REPO}),
-  "Apple Silicon, macOS <version>" under it, and the app screenshot site/media/today-light.png
-  (dark: today-dark.png via prefers-color-scheme) in a Mac window frame.
-- Then a few feature sections drawn from the real app (read app/ and components/; never claim
-  what it does not do), using the other screenshots; a privacy section (local database, no
-  account); the unsigned-app first-launch note; FAQ only if the current site has one worth
-  keeping; footer with GitHub link and the release notes link.
-- Light and dark themes from tokens, a real responsive layout down to 375px, semantic HTML,
-  alt text, no tracking scripts, fonts self-hosted or from Google Fonts, no new build tooling.
-- Keep the existing build working: run node site/build.mjs (it only touches site/), check it
-  exits 0, then serve site/dist (or whatever it outputs) with python3 -m http.server on a
-  port-check --next port and check the page loads and every asset returns 200 except the
-  site/media images, which may not exist yet. Stop the server.
-If an impeccable or frontend-design skill is available to you, use it for the design pass.`,
-  },
-  {
     key: 'beforeShots',
     model: SONNET,
     prompt: `Task: realistic demo data, a reusable screenshot tool, and the "before" screenshots of
@@ -421,18 +391,18 @@ focus session (f) and Time's up; end-of-day wrap and weekly reset; closing the w
 reopening from the Dock; quit while a timer runs; notification permission prompt; the update
 notification (test by temporarily setting a lower version); dark theme by hand in Settings.
 Then a short "release steps" section: version bump, PR, tag, check the workflow, check the
-download link, then deploy the site.
+download link.
 Check your script at least parses: node --check scripts/smoke-app.mjs.`,
   },
 ]
 
-// --- Route: the Opus router turns the six briefs into one conflict-free file map. ---
+// --- Route: the Opus router turns the five briefs into one conflict-free file map. ---
 phase('Route')
 const route = await agent(`${ROUTER}
 
-Six workers are about to run in the same working tree on branch rebrand/doem (the tree is
+Five workers are about to run in the same working tree on branch rebrand/doem (the tree is
 clean: the Freeze step just committed). Their briefs follow. Read them, then read the repo
-(git ls-files, package.json, scripts/, tests/, site/, docs/, rebuild/) to see what each brief
+(git ls-files, package.json, scripts/, tests/, docs/, rebuild/) to see what each brief
 really touches, including side effects such as renames, deletions, package.json script
 entries, tests that import a moved file, and generated folders.
 
@@ -443,7 +413,7 @@ Produce:
 - shared: files more than one worker must change (package.json is one: say which keys belong
   to whom). Keep this list as short as possible.
 - waves: the run order. Put workers in the same wave only if their paths cannot collide and
-  neither needs the other's output. Default is one wave with all six; split only for a real
+  neither needs the other's output. Default is one wave with all five; split only for a real
   dependency or collision.
 - risks: anything in the briefs that could break the build, the owner's data or the running
   app, and how the assignment prevents it.
@@ -550,8 +520,8 @@ Round ${round} of 2.
 
 Run, in ${REPO}: npm run lint (or npx eslint .), npx tsc --noEmit, the unit tests and the UI
 tests (read package.json and vitest.config.ts for the exact commands), and npx next build.
-Also: every image path referenced from README.md and site/ either exists or is one of the
-screenshots a later step captures (${MEDIA_NAMES} under docs/media/ and site/media/);
+Also: every image path referenced from README.md either exists or is one of the
+screenshots a later step captures (${MEDIA_NAMES} under docs/media/);
 package.json scripts point at files that exist; grep for "rebuild/" and for references to
 deleted files.
 
@@ -592,7 +562,7 @@ You may run npx next build and next start in ${REPO} now (nobody else is editing
 2. With scripts/screenshots.mjs capture the same screens as ${ARCHIVE}/screenshots/before/
    (match file names where a screen exists in both), light and dark, into
    ${ARCHIVE}/screenshots/after/.
-3. Copy ${MEDIA_NAMES} into docs/media/ and site/media/ as optimised PNGs: keep 2880x1800 in
+3. Copy ${MEDIA_NAMES} into docs/media/ as optimised PNGs: keep 2880x1800 in
    the archive, but put 1440-wide copies in the repo, each under 600 KB (sips or magick).
 4. Look at every image you put in the repo: no test-looking data, no personal paths, nothing
    private. Stop the server, delete the scratch data.`,
@@ -633,7 +603,7 @@ All history is backed up in ${ARCHIVE}/TaskManager-full-history-${DATE}.bundle.
 1. First commit the current working tree on rebrand/doem (git add -A; check git status shows
    no file over 5 MB being added and nothing from node_modules, .next, dist-electron,
    ${PACK_OUT} or .data) with the message:
-     chore: repo cleanup, README, website, update check, screenshots and tests
+     chore: repo cleanup, README, update check, screenshots and tests
      <blank line>
      Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 2. Create ${RELEASE_BRANCH} from main holding exactly that tree in one commit:
@@ -676,7 +646,7 @@ This is the only step in the run allowed to push. Repo: ${REPO}, remote origin
 2. Open a pull request with gh: base main, head ${RELEASE_BRANCH}, title "Doem ${VERSION}".
    Body: a short summary of the release taken from CHANGELOG.md (${VERSION} section), a
    "Before you tag" list (run docs/release-checklist.md; then tag v${VERSION} on main after the
-   merge, which starts the release workflow; deploy the site only after the DMG is attached),
+   merge, which starts the release workflow),
    and end the body with this exact line:
    🤖 Generated with [Claude Code](https://claude.com/claude-code)
    Do not merge it, do not enable auto-merge, do not request reviewers.
@@ -695,7 +665,7 @@ smoke case with its result); Screenshots (where the before and after sets are, h
 Not done or not verified (every notDone line, deduplicated); Owner decisions and hand checks
 (every needsOwner line, deduplicated, plus: run docs/release-checklist.md; rename the GitHub
 repo to ${GH_REPO}; merge the PR, then tag v${VERSION} on main, which starts the release
-workflow; deploy the site only after the release has its DMG; decide on deleting the old
+workflow; decide on deleting the old
 Tempo data folders). Say plainly whether ${RELEASE_BRANCH} was pushed and give the PR URL,
 or why it was not pushed. Write it to ${ARCHIVE}/launch-report-${DATE}.md and return the full text.
 

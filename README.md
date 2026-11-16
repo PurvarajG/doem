@@ -67,6 +67,11 @@ Everything has a key. `J` and `K` to move, `X` to finish, `T` for tomorrow, `F` 
 
 1. **[Download Doem](https://github.com/PurvarajG/doem/releases/latest/download/Doem-latest-arm64.dmg)** and drag it into Applications.
 2. The first time, right-click Doem and choose **Open**. You only need to do this once.
+3. If macOS says Doem "is damaged and can't be opened", that is because the app is not signed yet, not because the download is broken. Open Terminal, run this, then open Doem again:
+
+   ```bash
+   xattr -cr "/Applications/Doem.app"
+   ```
 
 <details>
 <summary>Requirements and first-launch help</summary>
@@ -76,6 +81,8 @@ Everything has a key. `J` and `K` to move, `X` to finish, `T` for tomorrow, `F` 
 Doem runs on Apple Silicon Macs (M1 and later) with macOS 12 or newer.
 
 The app is not yet signed with an Apple Developer certificate, so macOS asks before the first launch. Right-click Doem in Applications and choose Open, then choose Open in the dialog. If that option does not appear, open System Settings, go to Privacy & Security, find the message about Doem and choose Open Anyway. Later launches open normally.
+
+If macOS instead says Doem is damaged, run `xattr -cr "/Applications/Doem.app"` in Terminal. It removes the quarantine flag macOS adds to downloaded files, which is what blocks an unsigned app. If an update shows the same message, run it again.
 
 If you used the app under its earlier name, Tempo, Doem moves your existing data over on first launch.
 

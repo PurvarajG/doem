@@ -84,3 +84,22 @@ test("a template without exactly one done column can't be saved", async () => {
     /exactly one done column/,
   );
 });
+
+test("switching templates never completes a task, even when an open column shares the done column's name", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Name clash" });
+  // An open column called "Shipped"; the Software template's done column is also "Shipped".
+  await db.store.updateStage(stages[1].id, { name: "Shipped" });
+  const t = await db.store.addTask({
+    title: "Still open",
+    projectId: project.id,
+    stageId: stages[1].id,
+    scheduled: "2026-03-01",
+    minutes: 30,
+    priority: 0,
+  });
+
+  const created = await db.store.applyStageTemplate(project.id, findTemplate("software")!.stages);
+  const after = (await db.store.allTasks()).find((x) => x.id === t.id)!;
+  assert.equal(after.status, "open");
+  assert.notEqual(created.find((s) => s.id === after.stageId)?.kind, "done");
+});

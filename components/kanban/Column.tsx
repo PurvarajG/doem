@@ -209,7 +209,7 @@ export default function Column({
             if (e.key !== "Enter" || !draft.trim()) return;
             const text = draft;
             setDraft("");
-            await addTask(text, { projectId, stageId: stage.id }).catch(() => {});
+            await addTask(text, { projectId, stageId: stage.id, scheduled: null }).catch(() => {});
           }}
           className="mt-2 h-10 w-full rounded-tab bg-surface px-3 text-body ring-1 ring-line placeholder:text-ink-3"
         />

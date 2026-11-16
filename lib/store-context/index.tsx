@@ -159,18 +159,12 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const completeTask = useCallback(
     async (id: string) => {
       const prior = getTasks().find((t) => t.id === id);
-      const { ok, next } = await rawComplete(id);
+      const { ok } = await rawComplete(id);
       if (!ok) return;
       offerUndo("Marked done", async () => {
+        // The server removes the next occurrence if nobody has started it, and
+        // reopenTask refetches the list, so the copy drops out of local state.
         await reopenTask(id);
-        if (next) {
-          try {
-            await request(`/api/tasks/${next.id}/forever`, { method: "DELETE" });
-            setTasks((prev) => prev.filter((t) => t.id !== next.id));
-          } catch (error) {
-            onError((error as Error).message);
-          }
-        }
         if (prior?.stageId) {
           const current = getTasks().find((t) => t.id === id);
           if (current && (current.stageId !== prior.stageId || current.boardOrder !== prior.boardOrder)) {
@@ -179,7 +173,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         }
       });
     },
-    [rawComplete, reopenTask, rawMove, offerUndo, setTasks, getTasks, onError],
+    [rawComplete, reopenTask, rawMove, offerUndo, getTasks],
   );
 
   const trashTask = useCallback(
@@ -211,6 +205,24 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [upsertTask, offerUndo, rawTrash, onError],
+  );
+
+  const { removeStage: rawRemoveStage } = stages;
+  const removeStage = useCallback(
+    async (id: string, moveTo: string) => {
+      // A failed removal throws out of here before anything is refetched.
+      await rawRemoveStage(id, moveTo);
+      // The server moved the lane's tasks (completing them in a Done lane, which
+      // can spawn a recurring task's next occurrence), so take its list
+      // wholesale. The removal itself succeeded, so a failed read keeps local
+      // state rather than throwing.
+      try {
+        setTasks(await request<Task[]>("/api/tasks"));
+      } catch {
+        // Keep what we have; the next load catches up.
+      }
+    },
+    [rawRemoveStage, setTasks],
   );
 
   const patchTask = useCallback(
@@ -429,6 +441,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       rescheduleTasks,
       ...undoApi,
       ...stages,
+      removeStage,
       ...note,
       ...quickTodos,
       ...time,
@@ -457,6 +470,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       rescheduleTasks,
       undoApi,
       stages,
+      removeStage,
       note,
       quickTodos,
       time,

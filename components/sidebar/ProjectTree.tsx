@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTasks } from "@/lib/store-context";
 import { PROJECT_COLORS, projectColorVar, type Folder, type Project } from "@/lib/types";
+import { projectDeleteConsequence } from "@/lib/project-delete";
 import { readStoredKey } from "@/lib/storage-key";
 import Button from "../ui/Button";
 import Dialog from "../ui/Dialog";
@@ -491,12 +492,14 @@ export default function ProjectTree() {
         title={
           pendingDelete?.kind === "folder"
             ? `Delete folder "${pendingDelete.name}"?`
-            : `Delete "${pendingDelete?.name ?? ""}"?`
+            : `Delete ${pendingDelete?.name ?? ""}?`
         }
         description={
           pendingDelete?.kind === "folder"
             ? "Its projects stay and move back to the top of the list."
-            : "Its tasks move to No project."
+            : projectDeleteConsequence(
+                pendingDelete ? tasks.filter((t) => t.projectId === pendingDelete.id).length : 0,
+              )
         }
         initialFocusRef={cancelRef}
         actions={
@@ -517,7 +520,7 @@ export default function ProjectTree() {
                 setPendingDelete(null);
               }}
             >
-              Delete
+              Yes, delete {pendingDelete?.name}
             </Button>
           </>
         }

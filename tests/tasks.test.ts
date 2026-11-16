@@ -180,3 +180,298 @@ test("deleting a project leaves its tasks intact but unassigned", async () => {
   assert.equal(survivor?.projectId, undefined);
   assert.equal(survivor?.stageId, undefined);
 });
+
+// ── Status, lane and recurrence stay in agreement ────────────────────────────
+
+const WEEKLY = { freq: "weekly", interval: 1 } as const;
+
+async function successors(title: string, exceptId: string) {
+  return (await db.store.allTasks()).filter(
+    (t) => t.title === title && t.id !== exceptId && t.status === "open",
+  );
+}
+
+async function lane(stageId: string) {
+  return (await db.store.allTasks())
+    .filter((t) => t.stageId === stageId)
+    .sort((a, b) => a.boardOrder - b.boardOrder);
+}
+
+test("dragging a recurring task into Done creates exactly one next occurrence", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Drag recur" });
+  const t = await task({ title: "Drag weekly", projectId: project.id, recurrence: WEEKLY });
+
+  const done = await db.store.moveTaskToStage(t.id, stages[3].id, 0);
+  assert.equal(done?.status, "done");
+  assert.equal(done?.stageId, stages[3].id);
+  const next = await successors("Drag weekly", t.id);
+  assert.equal(next.length, 1);
+  assert.equal(next[0].stageId, stages[0].id, "the next occurrence lands in the first open lane");
+
+  // Reordering inside Done is not a second completion.
+  await db.store.moveTaskToStage(t.id, stages[3].id, 0);
+  assert.equal((await successors("Drag weekly", t.id)).length, 1);
+});
+
+test("a patch that lands in Done creates exactly one next occurrence", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Patch recur" });
+  const t = await task({ title: "Patch weekly", projectId: project.id, recurrence: WEEKLY });
+
+  const done = await db.store.updateTask(t.id, { stageId: stages[3].id });
+  assert.equal(done?.status, "done");
+  assert.ok(done?.completedAt);
+  assert.equal((await successors("Patch weekly", t.id)).length, 1);
+
+  await db.store.updateTask(t.id, { title: "Patch weekly", stageId: stages[3].id });
+  assert.equal((await successors("Patch weekly", t.id)).length, 1);
+});
+
+test("completing a done task again spawns nothing and changes nothing", async () => {
+  const { project } = await db.store.addProject({ name: "Twice" });
+  const t = await task({ title: "Twice weekly", projectId: project.id, recurrence: WEEKLY });
+
+  const first = await db.store.completeTask(t.id);
+  assert.ok(first?.next);
+  const again = await db.store.completeTask(t.id);
+  assert.equal(again?.next, null);
+  assert.equal(again?.task.completedAt, first?.task.completedAt);
+  assert.equal((await successors("Twice weekly", t.id)).length, 1);
+});
+
+test("a trashed task cannot be completed", async () => {
+  const t = await task({ title: "Gone" });
+  await db.store.trashTask(t.id);
+  assert.equal(await db.store.completeTask(t.id), null);
+  assert.equal((await db.store.getTask(t.id))?.status, "trashed");
+});
+
+test("reopening deletes the unstarted next occurrence", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Reopen recur" });
+  const t = await task({ title: "Reopen weekly", projectId: project.id, recurrence: WEEKLY });
+  const done = await db.store.completeTask(t.id);
+  assert.ok(done?.next);
+
+  await db.store.reopenTask(t.id);
+  assert.equal(await db.store.getTask(done.next.id), null);
+  assert.equal((await db.store.getTask(t.id))?.status, "open");
+
+  // Dragging a done task out of Done does the same.
+  const again = await db.store.completeTask(t.id);
+  assert.ok(again?.next);
+  await db.store.moveTaskToStage(t.id, stages[1].id, 0);
+  assert.equal(await db.store.getTask(again.next.id), null);
+
+  // So does a patch that takes it out of the done lane.
+  const third = await db.store.completeTask(t.id);
+  assert.ok(third?.next);
+  await db.store.updateTask(t.id, { stageId: stages[0].id });
+  assert.equal(await db.store.getTask(third.next.id), null);
+  assert.equal((await db.store.getTask(t.id))?.status, "open");
+});
+
+test("reopening keeps a next occurrence that has tracked time, and does not spawn another", async () => {
+  const { project } = await db.store.addProject({ name: "Started recur" });
+  const t = await task({ title: "Started weekly", projectId: project.id, recurrence: WEEKLY });
+  const done = await db.store.completeTask(t.id);
+  assert.ok(done?.next);
+  await db.store.addManualEntry({
+    taskId: done.next.id,
+    startedAt: "2026-03-01T09:00:00.000Z",
+    minutes: 15,
+  });
+
+  await db.store.reopenTask(t.id);
+  assert.ok(await db.store.getTask(done.next.id), "the started occurrence survives");
+
+  const again = await db.store.completeTask(t.id);
+  assert.equal(again?.next, null, "an open occurrence already links back to this task");
+});
+
+test("a done task that is trashed and restored comes back done in the Done lane", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Restore done" });
+  const t = await task({ projectId: project.id });
+  await db.store.completeTask(t.id);
+  await db.store.trashTask(t.id);
+
+  const restored = await db.store.restoreTask(t.id);
+  assert.equal(restored?.status, "done");
+  assert.ok(restored?.completedAt);
+  assert.equal(restored?.deletedAt, undefined);
+  assert.equal(restored?.stageId, stages[3].id);
+});
+
+test("an open task that is trashed and restored comes back open and spawns nothing", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Restore open" });
+  const t = await task({
+    title: "Restore weekly",
+    projectId: project.id,
+    stageId: stages[1].id,
+    recurrence: WEEKLY,
+  });
+  await db.store.trashTask(t.id);
+
+  const restored = await db.store.restoreTask(t.id);
+  assert.equal(restored?.status, "open");
+  assert.equal(restored?.stageId, stages[1].id);
+  assert.equal((await successors("Restore weekly", t.id)).length, 0);
+});
+
+test("restoring an open task whose lane became Done moves it to the first open lane", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Restore edge" });
+  const t = await task({ projectId: project.id, stageId: stages[1].id });
+  await db.store.trashTask(t.id);
+  // The lane is removed into Done while the task sits in the trash.
+  await db.store.removeStage(stages[1].id, stages[3].id);
+  assert.equal((await db.store.getTask(t.id))?.stageId, stages[3].id);
+  assert.equal((await db.store.getTask(t.id))?.status, "trashed");
+
+  const restored = await db.store.restoreTask(t.id);
+  assert.equal(restored?.status, "open");
+  assert.equal(restored?.completedAt, undefined);
+  assert.equal(restored?.stageId, stages[0].id);
+  assert.ok(restored?.stageEnteredAt);
+});
+
+test("restore appends to the lane without a duplicate board_order", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Restore order" });
+  const a = await task({ title: "A", projectId: project.id, stageId: stages[0].id });
+  const b = await task({ title: "B", projectId: project.id, stageId: stages[0].id });
+  const c = await task({ title: "C", projectId: project.id, stageId: stages[0].id });
+  await db.store.trashTask(b.id);
+
+  assert.deepEqual(
+    (await lane(stages[0].id)).filter((x) => x.status !== "trashed").map((x) => [x.title, x.boardOrder]),
+    [
+      ["A", 0],
+      ["C", 1],
+    ],
+  );
+
+  await db.store.restoreTask(b.id);
+  const after = await lane(stages[0].id);
+  assert.deepEqual(after.map((x) => x.title), ["A", "C", "B"]);
+  assert.deepEqual(after.map((x) => x.boardOrder), [0, 1, 2]);
+  assert.ok(a.id && c.id);
+});
+
+test("a drop lands at the visible position after a task was trashed", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Drop after trash" });
+  const a = await task({ title: "A", projectId: project.id, stageId: stages[0].id });
+  const b = await task({ title: "B", projectId: project.id, stageId: stages[0].id });
+  const c = await task({ title: "C", projectId: project.id, stageId: stages[0].id });
+  const mover = await task({ title: "Mover", projectId: project.id, stageId: stages[1].id });
+  await db.store.trashTask(a.id);
+
+  // The visible lane is B, C, so index 1 means between them.
+  await db.store.moveTaskToStage(mover.id, stages[0].id, 1);
+  const visible = (await lane(stages[0].id)).filter((x) => x.status !== "trashed");
+  assert.deepEqual(visible.map((x) => x.title), ["B", "Mover", "C"]);
+  assert.deepEqual(visible.map((x) => x.boardOrder), [0, 1, 2]);
+  assert.ok(b.id && c.id);
+});
+
+test("a drop lands at the visible position after a task was completed out of the lane", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Drop after complete" });
+  const a = await task({ title: "A", projectId: project.id, stageId: stages[0].id });
+  const b = await task({ title: "B", projectId: project.id, stageId: stages[0].id });
+  const c = await task({ title: "C", projectId: project.id, stageId: stages[0].id });
+  const mover = await task({ title: "Mover", projectId: project.id, stageId: stages[1].id });
+  await db.store.completeTask(a.id);
+
+  assert.deepEqual((await lane(stages[0].id)).map((x) => x.boardOrder), [0, 1]);
+  await db.store.moveTaskToStage(mover.id, stages[0].id, 1);
+  assert.deepEqual((await lane(stages[0].id)).map((x) => x.title), ["B", "Mover", "C"]);
+  assert.ok(b.id && c.id);
+});
+
+test("a drop into Done honours the index and ignores trashed tasks there", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Drop into done" });
+  const a = await task({ title: "A", projectId: project.id });
+  const b = await task({ title: "B", projectId: project.id });
+  const c = await task({ title: "C", projectId: project.id });
+  await db.store.completeTask(a.id);
+  await db.store.completeTask(b.id);
+  await db.store.trashTask(a.id);
+
+  await db.store.moveTaskToStage(c.id, stages[3].id, 0);
+  const visible = (await lane(stages[3].id)).filter((x) => x.status !== "trashed");
+  assert.deepEqual(visible.map((x) => x.title), ["C", "B"]);
+  assert.deepEqual(visible.map((x) => x.boardOrder), [0, 1]);
+});
+
+async function seedLane(titles: string[], name: string, trashedAt?: number) {
+  const { project, stages } = await db.store.addProject({ name });
+  const made = [];
+  for (const title of titles) {
+    made.push(await task({ title, projectId: project.id, stageId: stages[0].id }));
+  }
+  if (trashedAt !== undefined) await db.store.trashTask(made[trashedAt].id);
+  const visible = async () =>
+    (await lane(stages[0].id)).filter((x) => x.status !== "trashed");
+  return { stages, made, visible };
+}
+
+test("a same-lane drop down by one place lands where the board shows it", async () => {
+  const { stages, made, visible } = await seedLane(["X", "A", "B", "C"], "Same lane down one");
+  // Dropping X on the lower half of B sends index 3 (X still counted).
+  await db.store.moveTaskToStage(made[0].id, stages[0].id, 3);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "B", "X", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("a same-lane drop down by several places lands where the board shows it", async () => {
+  const { stages, made, visible } = await seedLane(["X", "A", "B", "C"], "Same lane down more");
+  await db.store.moveTaskToStage(made[0].id, stages[0].id, 2);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  await db.store.moveTaskToStage(made[0].id, stages[0].id, 4);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "B", "C", "X"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("a same-lane drop down with a trashed card in the lane uses visible positions", async () => {
+  // Lane is X, T (trashed), A, B, C; the board shows X, A, B, C.
+  const { stages, made, visible } = await seedLane(["X", "T", "A", "B", "C"], "Same lane trashed", 1);
+  await db.store.moveTaskToStage(made[0].id, stages[0].id, 3);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "B", "X", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("a same-lane drop down with a trashed card above the dragged one uses visible positions", async () => {
+  const { stages, made, visible } = await seedLane(["T", "X", "A", "B", "C"], "Same lane trashed above", 0);
+  await db.store.moveTaskToStage(made[1].id, stages[0].id, 2);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("a same-lane drop up still lands at the index", async () => {
+  const { stages, made, visible } = await seedLane(["A", "B", "C", "X"], "Same lane up");
+  await db.store.moveTaskToStage(made[3].id, stages[0].id, 1);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  await db.store.moveTaskToStage(made[3].id, stages[0].id, 0);
+  assert.deepEqual((await visible()).map((x) => x.title), ["X", "A", "B", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("dropping a card at its own position leaves the order unchanged", async () => {
+  const { stages, made, visible } = await seedLane(["A", "X", "B", "C"], "Same lane own spot");
+  // The card sits at 1; the board sends 1 (upper half) or 2 (lower half).
+  await db.store.moveTaskToStage(made[1].id, stages[0].id, 1);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  await db.store.moveTaskToStage(made[1].id, stages[0].id, 2);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("reordering downward inside the Done lane lands where the board shows it", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Done reorder down" });
+  const made = [];
+  for (const title of ["X", "A", "B", "C"]) made.push(await task({ title, projectId: project.id }));
+  for (const t of made) await db.store.completeTask(t.id);
+  assert.deepEqual((await lane(stages[3].id)).map((x) => x.title), ["X", "A", "B", "C"]);
+
+  await db.store.moveTaskToStage(made[0].id, stages[3].id, 3);
+  const done = await lane(stages[3].id);
+  assert.deepEqual(done.map((x) => x.title), ["A", "B", "X", "C"]);
+  assert.deepEqual(done.map((x) => x.boardOrder), [0, 1, 2, 3]);
+  assert.ok(done.every((x) => x.status === "done"));
+});

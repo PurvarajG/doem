@@ -148,18 +148,14 @@ export default function Board({
 
   const { dragTaskId, target, cardProps, columnProps } = useBoardDrag(onMove);
 
-  /** Adds a column just before Done, so the finish line stays last. */
+  /** The server places a new column just before Done. */
   async function createLane(keepOpen: boolean) {
     const name = laneName.trim().slice(0, 80);
     setLaneName("");
     if (!keepOpen) setAddingLane(false);
     if (!name) return;
     const created = await addStage(project.id, { name, kind: guessStageKind(name) });
-    if (!created) return;
-    const open = stages.filter((s) => s.kind !== "done").map((s) => s.id);
-    const done = stages.filter((s) => s.kind === "done").map((s) => s.id);
-    if (done.length) await reorderStages(project.id, [...open, created.id, ...done]);
-    setAnnouncement(`${name} column added.`);
+    if (created) setAnnouncement(`${name} column added.`);
   }
 
   function swap(index: number, offset: -1 | 1) {

@@ -47,7 +47,7 @@ describe("undo", () => {
     expect(mock.calls).toHaveLength(0);
   });
 
-  it("done: offers, then reopen reverts and removes the repeat copy", async () => {
+  it("done: offers, then reopen reverts and the list refetch drops the repeat copy", async () => {
     const { mock, task } = setup();
     await ready();
     mock.respondWith(`/api/tasks/${ID}/complete`, {
@@ -62,11 +62,23 @@ describe("undo", () => {
     expect(mutating(mock)).toEqual([
       `POST /api/tasks/${ID}/complete`,
       `POST /api/tasks/${ID}/reopen`,
-      `DELETE /api/tasks/${COPY}/forever`,
     ]);
     expect(screen.getByTestId("count").textContent).toBe("1");
     expect(JSON.parse(screen.getByTestId("state").textContent!).s).toBe("open");
     expect(offer()).toBe("none");
+  });
+
+  it("a patch that finishes the task refetches the list so the next occurrence shows", async () => {
+    const { mock, task } = setup();
+    await ready();
+    mock.respondWith(`/api/tasks/${ID}`, { ...task, status: "done", stageId: stages[3].id });
+    mock.respondNext("/api/tasks", [
+      { ...task, status: "done", stageId: stages[3].id },
+      makeTask({ id: COPY, title: "copy" }),
+    ], "GET");
+    await act(async () => api.patchTask(ID, { stageId: stages[3].id }));
+    expect(screen.getByTestId("count").textContent).toBe("2");
+    expect(JSON.parse(screen.getByTestId("state").textContent!).s).toBe("done");
   });
 
   it("trash: offers, then restore puts the task back", async () => {

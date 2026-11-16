@@ -242,8 +242,11 @@ describe("project kanban board", () => {
   test("Add lane takes a name and Enter, and the new column lands before Done", async () => {
     const { workspace } = board();
     const { mock } = renderWorkspace(<Surface />, workspace);
-    const review = { ...stages[1], id: "44444444-4444-4444-8444-444444444444", name: "Review", sortOrder: 4 };
+    const review = { ...stages[1], id: "44444444-4444-4444-8444-444444444444", name: "Review", sortOrder: 3 };
+    // The server slots the new lane before Done and the board takes its order.
+    const reordered = [...stages.slice(0, 3), review, { ...stages[3], sortOrder: 4 }];
     mock.respondNext(`/api/projects/${project.id}/stages`, review, "POST");
+    mock.respondNext(`/api/projects/${project.id}/stages`, reordered, "GET");
 
     await userEvent.click(await screen.findByRole("button", { name: "Add lane" }));
     await userEvent.type(screen.getByLabelText("New column name"), "Review{Enter}");
@@ -254,11 +257,8 @@ describe("project kanban board", () => {
       method: "POST",
       body: { name: "Review", kind: "active" },
     });
-    expect(mock.calls).toContainEqual({
-      url: "/api/stages/reorder",
-      method: "POST",
-      body: { projectId: project.id, ids: [stages[0].id, stages[1].id, stages[2].id, review.id, stages[3].id] },
-    });
+    const lanes = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
+    expect(lanes.slice(-2)).toEqual(["Review, 0 tasks", "Done, 0 tasks"]);
     // The field stays open for the next column.
     expect(screen.getByLabelText("New column name")).toHaveValue("");
   });
