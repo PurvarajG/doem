@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.4] - 2026-11-16
+
+### Added
+- Folders for projects. Click New folder in the sidebar, then drag projects onto a folder (or onto the Projects heading to take them out), or pick a folder in Project settings. Click a folder to collapse it; double-click to rename it. Deleting a folder keeps its projects.
+- Edit board columns on the board. Click a column name to rename it. Each column's menu moves it left or right, sets a limit, or deletes it. Done, and a board's last open column, can't be deleted.
+- Add a column from the board: click +, type a name, and press Enter. The field stays open for the next one. A name like Ideas or To do makes a backlog column, Waiting or On hold makes a blocked one, and anything else a working one.
+- Board templates: Standard, Simple, Software, Content and Pipeline. An empty board offers them in a row above the columns, which hides once you pick one or close it. Any board can switch in Project settings > Board template. Switching moves each task to the column with the same name, then the same type; done tasks stay done and no task is completed by a switch.
+- Save your own board templates: Project settings > Board template > Save these columns as a template. Saved templates show on every empty board and can be deleted without changing boards made from them.
+- What's new lists these changes once after the update.
+
+### Changed
+- In Project settings, Board template sits just above Lanes.
+
+### Known issues
+- Whether a board's template row was closed is remembered on this Mac only. If Doem's local storage is cleared, the row can show again on boards that are still empty.
+- On Today, a task row's hover buttons cover its commit target, so committing with the mouse doesn't work there. Point at the task and press `*`.
+- Reopening a repeating task removes its unstarted next one, including any subtasks you added to that next one.
+- Un-archiving a project whose name was reused leaves two active projects with the same name.
+
 ## [1.0.3] - 2026-11-16
 
 ### Added

@@ -38,8 +38,8 @@ describe("WhatsNew", () => {
   test("opens by itself the first time and lists every change", () => {
     render(<WhatsNew />);
     expect(screen.getByRole("dialog", { name: "What's new" })).toBeInTheDocument();
-    expect(screen.getByText("Manage lanes in Project settings")).toBeInTheDocument();
-    expect(screen.getByText("Archived projects have a home")).toBeInTheDocument();
+    expect(screen.getByText("Sort projects into folders")).toBeInTheDocument();
+    expect(screen.getByText("Save your own templates")).toBeInTheDocument();
   });
 
   test("waits for the store before opening", () => {
@@ -70,16 +70,9 @@ describe("WhatsNew", () => {
   test("Show me goes to the first active project and closes the sheet", async () => {
     const user = userEvent.setup();
     render(<WhatsNew />);
-    await user.click(screen.getByRole("button", { name: "Show me: Manage lanes in Project settings" }));
+    await user.click(screen.getByRole("button", { name: "Show me: Edit columns right on the board" }));
     expect(push).toHaveBeenCalledWith("/projects/p1");
     expect(screen.queryByRole("dialog")).toBeNull();
-  });
-
-  test("Show me for archived projects opens that Settings section", async () => {
-    const user = userEvent.setup();
-    render(<WhatsNew />);
-    await user.click(screen.getByRole("button", { name: "Show me: Archived projects have a home" }));
-    expect(push).toHaveBeenCalledWith("/settings#projects");
   });
 
   test("Take the tour closes the sheet and starts the walkthrough", async () => {
