@@ -398,3 +398,80 @@ test("a drop into Done honours the index and ignores trashed tasks there", async
   assert.deepEqual(visible.map((x) => x.title), ["C", "B"]);
   assert.deepEqual(visible.map((x) => x.boardOrder), [0, 1]);
 });
+
+async function seedLane(titles: string[], name: string, trashedAt?: number) {
+  const { project, stages } = await db.store.addProject({ name });
+  const made = [];
+  for (const title of titles) {
+    made.push(await task({ title, projectId: project.id, stageId: stages[0].id }));
+  }
+  if (trashedAt !== undefined) await db.store.trashTask(made[trashedAt].id);
+  const visible = async () =>
+    (await lane(stages[0].id)).filter((x) => x.status !== "trashed");
+  return { stages, made, visible };
+}
+
+test("a same-lane drop down by one place lands where the board shows it", async () => {
+  const { stages, made, visible } = await seedLane(["X", "A", "B", "C"], "Same lane down one");
+  // Dropping X on the lower half of B sends index 3 (X still counted).
+  await db.store.moveTaskToStage(made[0].id, stages[0].id, 3);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "B", "X", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("a same-lane drop down by several places lands where the board shows it", async () => {
+  const { stages, made, visible } = await seedLane(["X", "A", "B", "C"], "Same lane down more");
+  await db.store.moveTaskToStage(made[0].id, stages[0].id, 2);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  await db.store.moveTaskToStage(made[0].id, stages[0].id, 4);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "B", "C", "X"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("a same-lane drop down with a trashed card in the lane uses visible positions", async () => {
+  // Lane is X, T (trashed), A, B, C; the board shows X, A, B, C.
+  const { stages, made, visible } = await seedLane(["X", "T", "A", "B", "C"], "Same lane trashed", 1);
+  await db.store.moveTaskToStage(made[0].id, stages[0].id, 3);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "B", "X", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("a same-lane drop down with a trashed card above the dragged one uses visible positions", async () => {
+  const { stages, made, visible } = await seedLane(["T", "X", "A", "B", "C"], "Same lane trashed above", 0);
+  await db.store.moveTaskToStage(made[1].id, stages[0].id, 2);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("a same-lane drop up still lands at the index", async () => {
+  const { stages, made, visible } = await seedLane(["A", "B", "C", "X"], "Same lane up");
+  await db.store.moveTaskToStage(made[3].id, stages[0].id, 1);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  await db.store.moveTaskToStage(made[3].id, stages[0].id, 0);
+  assert.deepEqual((await visible()).map((x) => x.title), ["X", "A", "B", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("dropping a card at its own position leaves the order unchanged", async () => {
+  const { stages, made, visible } = await seedLane(["A", "X", "B", "C"], "Same lane own spot");
+  // The card sits at 1; the board sends 1 (upper half) or 2 (lower half).
+  await db.store.moveTaskToStage(made[1].id, stages[0].id, 1);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  await db.store.moveTaskToStage(made[1].id, stages[0].id, 2);
+  assert.deepEqual((await visible()).map((x) => x.title), ["A", "X", "B", "C"]);
+  assert.deepEqual((await visible()).map((x) => x.boardOrder), [0, 1, 2, 3]);
+});
+
+test("reordering downward inside the Done lane lands where the board shows it", async () => {
+  const { project, stages } = await db.store.addProject({ name: "Done reorder down" });
+  const made = [];
+  for (const title of ["X", "A", "B", "C"]) made.push(await task({ title, projectId: project.id }));
+  for (const t of made) await db.store.completeTask(t.id);
+  assert.deepEqual((await lane(stages[3].id)).map((x) => x.title), ["X", "A", "B", "C"]);
+
+  await db.store.moveTaskToStage(made[0].id, stages[3].id, 3);
+  const done = await lane(stages[3].id);
+  assert.deepEqual(done.map((x) => x.title), ["A", "B", "X", "C"]);
+  assert.deepEqual(done.map((x) => x.boardOrder), [0, 1, 2, 3]);
+  assert.ok(done.every((x) => x.status === "done"));
+});

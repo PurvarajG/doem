@@ -369,7 +369,9 @@ export async function updateTask(id: string, patch: Partial<TaskInput>): Promise
 /**
  * Kanban drop: place `id` at `index` within `stageId`. `index` is the position
  * among the column's non-trashed tasks (what the board renders), and board
- * order is renumbered densely in both columns. Status follows the column: a
+ * order is renumbered densely in both columns. The board counts the dragged
+ * card itself, so a move down within its own column lands one slot earlier
+ * once the card is lifted out. Status follows the column: a
  * drop into Done completes the task (spawning the next occurrence of a
  * recurring one), a drop of a done task anywhere else reopens it.
  */
@@ -387,9 +389,22 @@ export async function moveTaskToStage(
       throw new TaskInvariantError("That column belongs to a different project");
     }
 
+    // The board's index counts the dragged card. placeInStage lifts it out
+    // first, so a card dropped below where it sits needs one less.
+    let at = index;
+    if (task.stageId === stageId && task.status !== "trashed") {
+      const lane = await tx.query<{ id: string }>(
+        `select id from tasks where stage_id = $1 and status <> 'trashed'
+          order by board_order asc, created_at asc`,
+        [stageId],
+      );
+      const current = lane.findIndex((r) => r.id === id);
+      if (current >= 0 && current < index) at = index - 1;
+    }
+
     const landsInDone = stage.kind === "done";
     if (landsInDone && task.status === "open") {
-      await finishTask(tx, id, { index, stageId });
+      await finishTask(tx, id, { index: at, stageId });
       return getTask(id, tx);
     }
 
@@ -401,7 +416,7 @@ export async function moveTaskToStage(
       }${from !== stageId ? `, stage_entered_at = now()` : ""} where id = $1`,
       [id, stageId],
     );
-    await placeInStage(tx, stageId, id, index);
+    await placeInStage(tx, stageId, id, at);
     if (from && from !== stageId) await renumberStage(tx, from);
     if (reopening) await releaseSuccessors(tx, id);
 
