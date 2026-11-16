@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type {
   Activity,
   Category,
+  Folder,
   GeneralNote,
   Project,
   ProjectStage,
@@ -16,6 +17,8 @@ import type {
 } from "../types";
 import { useNote, type NoteApi } from "./use-note";
 import { useDayReviews, type DayReviewsApi } from "./use-day-reviews";
+import { useFolders, type FoldersApi } from "./use-folders";
+import { useBoardTemplates, type BoardTemplatesApi } from "./use-board-templates";
 import { useQuickTodos, type QuickTodosApi } from "./use-quick-todos";
 import { useSegments, type SegmentsApi } from "./use-segments";
 import { useStages, type StagesApi } from "./use-stages";
@@ -25,6 +28,7 @@ import { useTrackingConfig, type TrackingConfigApi } from "./use-tracking-config
 import { useUndo, type UndoAction, type UndoApi } from "./use-undo";
 import { request } from "./request";
 import { fmtDate, fmtWeekday } from "@/lib/format";
+import type { BoardTemplate } from "@/lib/board-templates";
 
 export { RequestFailed } from "./request";
 export type { SaveState } from "./use-note";
@@ -41,6 +45,8 @@ type WorkspaceValue = Omit<
   SegmentsApi &
   TrackingConfigApi &
   DayReviewsApi &
+  FoldersApi &
+  BoardTemplatesApi &
   UndoApi & {
     restoreTask: (id: string) => Promise<void>;
     completeTask: (id: string) => Promise<void>;
@@ -53,6 +59,8 @@ type WorkspaceValue = Omit<
       opts?: { defaultScheduled?: string | null; projectId?: string },
     ) => Promise<Task[]>;
     rescheduleTasks: (ids: string[], day: string | null) => Promise<Task[]>;
+    /** Swaps a board's columns for a template's; false when it didn't save. */
+    applyBoardTemplate: (projectId: string, template: string) => Promise<boolean>;
     ready: boolean;
     error: string | null;
     dismissError: () => void;
@@ -108,6 +116,8 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const segments = useSegments(onError);
   const trackingConfig = useTrackingConfig(onError);
   const dayReviews = useDayReviews(onError);
+  const folders = useFolders(onError, tasks.setProjects);
+  const boardTemplates = useBoardTemplates(onError);
 
   const { setTasks, getTasks } = tasks;
   const undoApi = useUndo();
@@ -298,6 +308,8 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const { setTimeEntries, setRunning } = time;
   const { setCategories, setActivities, setRunningSegment } = segments;
   const { setSettings } = trackingConfig;
+  const { setFolders } = folders;
+  const { setCustomTemplates } = boardTemplates;
 
   useEffect(() => {
     Promise.all([
@@ -338,6 +350,19 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       .catch(() => setError("Couldn't load your workspace"))
       .finally(() => setReady(true));
 
+    // Folders only group the sidebar, so a failure here never blocks the app.
+    fetch("/api/folders")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((f: Folder[]) => setFolders(Array.isArray(f) ? f : []))
+      .catch(() => {
+        // Projects still show, just ungrouped.
+      });
+    // Saved board templates: the built-ins still work if this fails.
+    fetch("/api/board-templates")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((t: BoardTemplate[]) => setCustomTemplates(Array.isArray(t) ? t : []))
+      .catch(() => {});
+
     // A segment started from Tracking's Now module keeps running across pages
     // and restarts, so the sidebar card needs it from the start, not only once
     // the Tracking page has loaded. Separate from the workspace load so a
@@ -363,7 +388,29 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     setActivities,
     setSettings,
     setRunningSegment,
+    setFolders,
+    setCustomTemplates,
   ]);
+
+  const { setStages: setAllStages } = stages;
+  const applyBoardTemplate = useCallback(
+    async (projectId: string, template: string) => {
+      try {
+        const result = await request<{ stages: ProjectStage[]; tasks: Task[] }>(
+          `/api/projects/${projectId}/template`,
+          { method: "POST", body: JSON.stringify({ template }) },
+        );
+        setAllStages((prev) => [...prev.filter((s) => s.projectId !== projectId), ...result.stages]);
+        const moved = new Map(result.tasks.map((t) => [t.id, t]));
+        setTasks((prev) => prev.map((t) => moved.get(t.id) ?? t));
+        return true;
+      } catch (error) {
+        onError((error as Error).message);
+        return false;
+      }
+    },
+    [setAllStages, setTasks, onError],
+  );
 
   const dismissError = useCallback(() => setError(null), []);
   const openTask = useCallback((id: string) => setOpenTaskId(id), []);
@@ -388,6 +435,9 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       ...segments,
       ...trackingConfig,
       ...dayReviews,
+      ...folders,
+      ...boardTemplates,
+      applyBoardTemplate,
       ready,
       error,
       dismissError,
@@ -413,6 +463,9 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       segments,
       trackingConfig,
       dayReviews,
+      folders,
+      boardTemplates,
+      applyBoardTemplate,
       ready,
       error,
       dismissError,

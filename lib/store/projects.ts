@@ -26,10 +26,10 @@ export async function addProject(
     );
     const color = input.color ?? PROJECT_COLORS[Number(count) % PROJECT_COLORS.length];
     const rows = await tx.query<ProjectRow>(
-      `insert into projects (id, name, color, default_category_id, sort_order)
-       values ($1,$2,$3,$4, coalesce((select max(sort_order)+1 from projects), 0))
+      `insert into projects (id, name, color, default_category_id, folder_id, sort_order)
+       values ($1,$2,$3,$4,$5, coalesce((select max(sort_order)+1 from projects), 0))
        returning *`,
-      [randomUUID(), input.name, color, input.defaultCategoryId || null],
+      [randomUUID(), input.name, color, input.defaultCategoryId || null, input.folderId || null],
     );
     const project = rowToProject(rows[0]);
     return { project, stages: await createDefaultStages(tx, project.id) };
@@ -68,6 +68,10 @@ export async function updateProject(
   if (patch.defaultCategoryId !== undefined) {
     sets.push(`default_category_id = $${i++}`);
     vals.push(patch.defaultCategoryId || null);
+  }
+  if (patch.folderId !== undefined) {
+    sets.push(`folder_id = $${i++}`);
+    vals.push(patch.folderId || null);
   }
   if (sets.length === 0) return getProject(id);
   vals.push(id);

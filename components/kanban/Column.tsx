@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTasks } from "@/lib/store-context";
 import type { ProjectStage, Task } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
+import Menu from "@/components/ui/Menu";
 import Card from "./Card";
 import { laneCountLabel, laneGlyph, openInStage } from "./lanes";
 
@@ -20,7 +21,15 @@ export default function Column({
   cardProps,
   columnProps,
   onMove,
+  laneActions,
 }: {
+  /** Column management from the header menu. A missing action shows disabled. */
+  laneActions?: {
+    moveLeft?: () => void;
+    moveRight?: () => void;
+    setLimit: () => void;
+    remove?: () => void;
+  };
   stage: ProjectStage;
   stages: ProjectStage[];
   tasks: Task[];
@@ -34,8 +43,21 @@ export default function Column({
   columnProps: (stageId: string, count: number) => React.HTMLAttributes<HTMLElement>;
   onMove: (taskId: string, stageId: string, index: number) => void;
 }) {
-  const { addTask } = useTasks();
+  const { addTask, renameStage } = useTasks();
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(stage.name);
   const [adding, setAdding] = useState(false);
+
+  function startRename() {
+    setNameDraft(stage.name);
+    setRenaming(true);
+  }
+
+  function commitRename() {
+    const next = nameDraft.trim();
+    setRenaming(false);
+    if (next && next !== stage.name) void renameStage(stage.id, next.slice(0, 80));
+  }
   const [draft, setDraft] = useState("");
   const [expanded, setExpanded] = useState(false);
 
@@ -61,9 +83,75 @@ export default function Column({
             <Icon name={glyph} />
           </span>
         )}
-        {stage.name}
-        <span className={`font-normal ${count.over ? "text-med" : "text-ink-3"}`}>{count.text}</span>
+        {renaming ? (
+          <input
+            autoFocus
+            value={nameDraft}
+            aria-label={`Rename ${stage.name}`}
+            onFocus={(e) => e.currentTarget.select()}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") {
+                setNameDraft(stage.name);
+                setRenaming(false);
+              }
+            }}
+            onBlur={commitRename}
+            className="h-8 min-w-0 flex-1 rounded-tile bg-surface px-2 text-title text-ink ring-1 ring-line"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={startRename}
+            title="Click to rename"
+            className="min-w-0 truncate rounded-tile text-left hover:text-ink-2"
+          >
+            {stage.name}
+          </button>
+        )}
+        {!renaming && (
+          <span className={`font-normal ${count.over ? "text-med" : "text-ink-3"}`}>{count.text}</span>
+        )}
         <span className="ml-auto flex items-center gap-1">
+          {laneActions && !renaming && (
+            <Menu
+              variant="icon"
+              label={<Icon name="more" />}
+              ariaLabel={`${stage.name} lane options`}
+              items={[
+                { id: "rename", label: "Rename", onSelect: startRename },
+                {
+                  id: "left",
+                  label: "Move left",
+                  disabled: !laneActions.moveLeft,
+                  onSelect: () => laneActions.moveLeft?.(),
+                },
+                {
+                  id: "right",
+                  label: "Move right",
+                  disabled: !laneActions.moveRight,
+                  onSelect: () => laneActions.moveRight?.(),
+                },
+                {
+                  id: "limit",
+                  label: stage.wipLimit ? `Limit: ${stage.wipLimit} (change)` : "Set a limit",
+                  onSelect: laneActions.setLimit,
+                },
+                {
+                  id: "remove",
+                  label: laneActions.remove
+                    ? "Delete column"
+                    : isDone
+                      ? "Delete column (every board keeps a done column)"
+                      : "Delete column (a board needs one open column)",
+                  danger: true,
+                  disabled: !laneActions.remove,
+                  onSelect: () => laneActions.remove?.(),
+                },
+              ]}
+            />
+          )}
           {!isDone && (
             <button
               type="button"

@@ -258,3 +258,21 @@ alter table tracking_settings add column if not exists claude_awareness boolean 
 alter table tracking_settings add column if not exists date_order text not null default 'dmy';
 -- Whether the one-time quick_todos -> inbox copy has run (see migrate.ts).
 alter table tracking_settings add column if not exists quick_todos_migrated boolean not null default false;
+
+-- Folders group projects into areas in the sidebar. Deleting a folder leaves
+-- its projects in place, just unfiled.
+create table if not exists folders (
+  id uuid primary key,
+  name text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table projects add column if not exists folder_id uuid references folders(id) on delete set null;
+
+-- Board column sets the user saved to reuse. stages is [{name, kind}, ...].
+create table if not exists board_templates (
+  id uuid primary key,
+  name text not null,
+  stages jsonb not null,
+  created_at timestamptz not null default now()
+);

@@ -23,7 +23,7 @@ export default function RemoveStageDialog({
   onClose: () => void;
   onRemoved: (message: string) => void;
 }) {
-  const { removeStage } = useTasks();
+  const { removeStage, setTasks } = useTasks();
   const [destination, setDestination] = useState("");
   const [busy, setBusy] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -42,7 +42,19 @@ export default function RemoveStageDialog({
     if (!canRemove || busy) return;
     setBusy(true);
     try {
-      await removeStage(stage.id, destination || siblings[0].id);
+      const targetId = destination || siblings[0].id;
+      await removeStage(stage.id, targetId);
+      // The server moved the tasks; mirror it so they don't vanish until reload.
+      const target = siblings.find((s) => s.id === targetId);
+      const toDone = target?.kind === "done";
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.stageId !== stage.id) return t;
+          const status =
+            t.status === "trashed" ? t.status : toDone ? "done" : t.status === "done" ? "open" : t.status;
+          return { ...t, stageId: targetId, boardOrder: t.boardOrder + 1_000_000, status };
+        }),
+      );
       onRemoved(`${stage.name} column removed.`);
       onClose();
     } catch {

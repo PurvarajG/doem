@@ -9,6 +9,7 @@ import type {
   DayReview,
   DockBadge,
   Duration,
+  Folder,
   Priority,
   Project,
   ProjectStage,
@@ -62,6 +63,14 @@ export type ProjectRow = {
   sort_order: number;
   created_at: string;
   default_category_id: string | null;
+  folder_id: string | null;
+};
+
+export type FolderRow = {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
 };
 
 export type StageRow = {
@@ -173,7 +182,12 @@ export function rowToProject(r: ProjectRow): Project {
     sortOrder: r.sort_order,
     createdAt: ts(r.created_at),
     defaultCategoryId: r.default_category_id ?? undefined,
+    folderId: r.folder_id ?? undefined,
   };
+}
+
+export function rowToFolder(r: FolderRow): Folder {
+  return { id: r.id, name: r.name, sortOrder: r.sort_order, createdAt: ts(r.created_at) };
 }
 
 export function rowToStage(r: StageRow): ProjectStage {

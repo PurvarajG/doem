@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import ProjectSettings from "@/components/ProjectSettings";
-import { emptyWorkspace, makeProject, makeTask, renderWorkspace } from "./harness";
+import { emptyWorkspace, makeProject, makeStages, makeTask, renderWorkspace } from "./harness";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -21,6 +21,34 @@ function setup(project_ = project, tasks = [makeTask({ projectId: project_.id })
 }
 
 describe("ProjectSettings", () => {
+  test("saves the board's columns as a named template", async () => {
+    const stages = makeStages(project.id);
+    const { mock } = renderWorkspace(
+      <ProjectSettings project={project} onClose={vi.fn()} />,
+      emptyWorkspace({ projects: [project], tasks: [], stages }),
+    );
+    mock.respondNext("/api/board-templates", {
+      id: "55555555-5555-4555-8555-555555555555",
+      name: "My board",
+      stages: stages.map((s) => ({ name: s.name, kind: s.kind })),
+      custom: true,
+    }, "POST");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Save these columns as a template" }));
+    const field = screen.getByLabelText("Template name");
+    await userEvent.clear(field);
+    await userEvent.type(field, "My board{Enter}");
+
+    expect(await screen.findByRole("status")).toHaveTextContent('Saved "My board"');
+    expect(mock.calls).toContainEqual({
+      url: "/api/board-templates",
+      method: "POST",
+      body: { name: "My board", stages: stages.map((s) => ({ name: s.name, kind: s.kind })) },
+    });
+    expect(screen.getByRole("option", { name: /^My board:/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete template My board" })).toBeInTheDocument();
+  });
+
   test("rename saves the trimmed name; blank is ignored", async () => {
     const { mock } = setup();
     const input = await screen.findByLabelText("Name");

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import Board from "@/components/kanban/Board";
@@ -30,6 +30,12 @@ const rect = (r: Partial<DOMRect>): DOMRect =>
 describe("project kanban board", () => {
   // jsdom has no layout; menus stay hidden until they can measure themselves.
   beforeEach(() => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => stored.set(key, value),
+      removeItem: (key: string) => stored.delete(key),
+    });
     Element.prototype.getBoundingClientRect = vi.fn(function (this: Element) {
       if (this.hasAttribute("data-picker-menu")) return rect({ height: 120, width: 180 });
       if (this.getAttribute("aria-haspopup") === "menu") return rect({ top: 100, bottom: 136, left: 20, right: 100, width: 80, height: 36 });
@@ -85,25 +91,69 @@ describe("project kanban board", () => {
     expect(screen.getByRole("region", { name: "Blocked, 0 tasks" })).toBeInTheDocument();
   });
 
-  test("lanes have no options menu: no rename, limit, reorder or remove", async () => {
+  test("clicking a column name renames it in place", async () => {
     const { workspace } = board();
-    renderWorkspace(<Surface />, workspace);
+    const { mock } = renderWorkspace(<Surface />, workspace);
 
-    await screen.findByRole("region", { name: "Blocked, 0 tasks" });
-    expect(screen.queryByRole("button", { name: /lane options/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Blocked" }));
+    const field = screen.getByLabelText("Rename Blocked");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Waiting{Enter}");
+
+    expect(await screen.findByRole("region", { name: "Waiting, 0 tasks" })).toBeInTheDocument();
+    expect(mock.calls).toContainEqual({
+      url: `/api/stages/${stages[2].id}`,
+      method: "PATCH",
+      body: { name: "Waiting" },
+    });
   });
 
-  test("a new column can't be created as a second done column", async () => {
+  test("the lane menu moves a column, and Done can't be deleted", async () => {
     const { workspace } = board();
-    renderWorkspace(<Surface />, workspace);
+    const { mock } = renderWorkspace(<Surface />, workspace);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Add lane" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Done lane options" }));
+    expect(screen.getByRole("menuitem", { name: /Delete column/ })).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(screen.getByRole("menuitem", { name: "Move left" }));
 
-    const kinds = within(screen.getByLabelText("Behaves as"))
-      .getAllByRole("option")
-      .map((o) => o.textContent);
-    expect(kinds).toEqual(["backlog", "active", "blocked"]);
+    await waitFor(() =>
+      expect(mock.calls).toContainEqual({
+        url: "/api/stages/reorder",
+        method: "POST",
+        body: { projectId: project.id, ids: [stages[0].id, stages[1].id, stages[3].id, stages[2].id] },
+      }),
+    );
+  });
+
+  test("an empty board offers templates; a board with tasks doesn't", async () => {
+    renderWorkspace(<Surface />, emptyWorkspace({ tasks: [], projects: [project], stages }));
+    expect(await screen.findByRole("button", { name: "Simple" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Standard" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("the template strip goes away once a template is picked", async () => {
+    const { mock } = renderWorkspace(<Surface />, emptyWorkspace({ tasks: [], projects: [project], stages }));
+    mock.respondNext(`/api/projects/${project.id}/template`, { stages, tasks: [] }, "POST");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Simple" }));
+
+    await waitFor(() => expect(screen.queryByText("Start from a template:")).not.toBeInTheDocument());
+    expect(mock.calls).toContainEqual({
+      url: `/api/projects/${project.id}/template`,
+      method: "POST",
+      body: { template: "simple" },
+    });
+  });
+
+  test("the template strip can be closed, and stays closed", async () => {
+    const view = renderWorkspace(<Surface />, emptyWorkspace({ tasks: [], projects: [project], stages }));
+    await userEvent.click(await screen.findByRole("button", { name: "Hide templates" }));
+    expect(screen.queryByText("Start from a template:")).not.toBeInTheDocument();
+
+    view.unmount();
+    renderWorkspace(<Surface />, emptyWorkspace({ tasks: [], projects: [project], stages }));
+    await screen.findByRole("region", { name: "Backlog, 0 tasks" });
+    expect(screen.queryByText("Start from a template:")).not.toBeInTheDocument();
   });
 
   test("carried-over cards say \"Carried over\" in words, not only in colour", async () => {
@@ -189,17 +239,28 @@ describe("project kanban board", () => {
     expect(scroller).not.toHaveAttribute("data-fade");
   });
 
-  test("an Add lane tile adds a lane and announces it", async () => {
+  test("Add lane takes a name and Enter, and the new column lands before Done", async () => {
     const { workspace } = board();
     const { mock } = renderWorkspace(<Surface />, workspace);
+    const review = { ...stages[1], id: "44444444-4444-4444-8444-444444444444", name: "Review", sortOrder: 4 };
+    mock.respondNext(`/api/projects/${project.id}/stages`, review, "POST");
 
     await userEvent.click(await screen.findByRole("button", { name: "Add lane" }));
-    const dialog = await screen.findByRole("dialog", { name: "Add a lane" });
-    await userEvent.type(within(dialog).getByLabelText("Lane name"), "Review");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Add" }));
+    await userEvent.type(screen.getByLabelText("New column name"), "Review{Enter}");
 
     await waitFor(() => expect(screen.getByText("Review column added.")).toBeInTheDocument());
-    expect(mock.calls.some((c) => c.method === "POST" && c.url.includes("stages"))).toBe(true);
+    expect(mock.calls).toContainEqual({
+      url: `/api/projects/${project.id}/stages`,
+      method: "POST",
+      body: { name: "Review", kind: "active" },
+    });
+    expect(mock.calls).toContainEqual({
+      url: "/api/stages/reorder",
+      method: "POST",
+      body: { projectId: project.id, ids: [stages[0].id, stages[1].id, stages[2].id, review.id, stages[3].id] },
+    });
+    // The field stays open for the next column.
+    expect(screen.getByLabelText("New column name")).toHaveValue("");
   });
 
   test("the lane track sizes to its lanes and Add lane sits right after it", async () => {

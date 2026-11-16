@@ -8,7 +8,8 @@ export type StagesApi = {
   stages: ProjectStage[];
   setStages: React.Dispatch<React.SetStateAction<ProjectStage[]>>;
   stagesFor: (projectId: string) => ProjectStage[];
-  addStage: (projectId: string, input: StageInput) => Promise<void>;
+  /** Resolves to the new column, or null when it couldn't be saved. */
+  addStage: (projectId: string, input: StageInput) => Promise<ProjectStage | null>;
   renameStage: (id: string, name: string) => Promise<void>;
   reorderStages: (projectId: string, ids: string[]) => Promise<void>;
   removeStage: (id: string, moveTo: string) => Promise<void>;
@@ -37,8 +38,10 @@ export function useStages(onError: (message: string) => void): StagesApi {
           body: JSON.stringify(input),
         });
         setStages((prev) => [...prev, created]);
+        return created;
       } catch (error) {
         onError((error as Error).message);
+        return null;
       }
     },
     [onError],
