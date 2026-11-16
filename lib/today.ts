@@ -133,9 +133,9 @@ export function headline(openCount: number, cap: Capacity): string {
   return `${count} left, and ${fmt(cap.freeMinutes)} still free before ${cap.endLabel}.`;
 }
 
-/** The one Inbox rule: open, no day yet, and not hidden until a later date. */
+/** The one Inbox rule: open, no day, no project, and not hidden until a later date. An undated project task is backlog, not inbox. */
 export function isInbox(t: Task, todayISO: string): boolean {
-  return t.status === "open" && t.scheduled === null && !isHiddenUntil(t, todayISO);
+  return t.status === "open" && t.scheduled === null && !t.projectId && !isHiddenUntil(t, todayISO);
 }
 
 export function inboxCount(tasks: Task[], todayISO: string): number {

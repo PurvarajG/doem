@@ -215,6 +215,11 @@ test("isInbox is the one Inbox rule", () => {
   assert.equal(isInbox(mk({ scheduled: null, startOn: TODAY }), TODAY), true);
 });
 
+test("isInbox needs no project: an undated project task is backlog", () => {
+  assert.equal(isInbox(mk({ scheduled: null, projectId: "p1" }), TODAY), false);
+  assert.equal(isInbox(mk({ scheduled: null, projectId: undefined }), TODAY), true);
+});
+
 test("inboxCount equals the number of isInbox tasks", () => {
   const tasks = [
     mk({ scheduled: null }),
@@ -225,4 +230,9 @@ test("inboxCount equals the number of isInbox tasks", () => {
   ];
   assert.equal(inboxCount(tasks, TODAY), tasks.filter((t) => isInbox(t, TODAY)).length);
   assert.equal(inboxCount(tasks, TODAY), 2);
+});
+
+test("inboxCount excludes undated project tasks", () => {
+  const tasks = [mk({ scheduled: null }), mk({ scheduled: null, projectId: "p1" }), mk({ scheduled: null, projectId: "p2" })];
+  assert.equal(inboxCount(tasks, TODAY), 1);
 });
