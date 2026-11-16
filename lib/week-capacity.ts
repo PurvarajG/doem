@@ -52,27 +52,48 @@ export function capacityCeilingMinutes(
   return busiest > 0 ? busiest : 1;
 }
 
+/** A multi-day task whose `scheduled..finishDate` range covers `date` (the same rule as lib/today.ts's isPlanned). */
+function spansDay(t: Task, date: string): boolean {
+  return t.isComplex && t.scheduled !== null && t.finishDate !== undefined && t.scheduled <= date && date <= t.finishDate;
+}
+
+/**
+ * Week totals that count each task once even when it appears in several day
+ * columns (a multi-day task). Per-day appearances beyond the first are taken
+ * back out of the summed per-day minutes.
+ */
+function distinctTotals(days: { tasks: Task[]; plannedMinutes: number }[]): { count: number; minutes: number } {
+  const seen = new Set<string>();
+  let minutes = days.reduce((n, d) => n + d.plannedMinutes, 0);
+  for (const d of days) {
+    for (const t of d.tasks) {
+      if (seen.has(t.id)) minutes -= t.minutes;
+      else seen.add(t.id);
+    }
+  }
+  return { count: seen.size, minutes };
+}
+
 /**
  * Builds the seven day-columns (today through today+6 inclusive) for the
  * Next 7 Days grid, each with its planned minutes and a capacity ratio
  * derived from `settings`.
  */
 export function buildWeekPlan(tasks: Task[], todayISO: string, settings: TrackingSettings | null): WeekDayPlan[] {
-  const horizon = addDays(todayISO, 6);
-  const open = tasks.filter(
-    (t): t is Task & { scheduled: string } =>
-      t.status === "open" && t.scheduled !== null && t.scheduled >= todayISO && t.scheduled <= horizon,
-  );
-
-  const byDay = new Map<string, Task[]>();
-  for (const t of open) {
-    const list = byDay.get(t.scheduled) ?? [];
-    list.push(t);
-    byDay.set(t.scheduled, list);
-  }
-
   const dates: string[] = [];
   for (let i = 0; i <= 6; i++) dates.push(addDays(todayISO, i));
+
+  const open = tasks.filter(
+    (t): t is Task & { scheduled: string } => t.status === "open" && t.scheduled !== null,
+  );
+
+  // A multi-day task belongs to every day of its span, including one that
+  // started before today; any other task belongs to its start day only.
+  const byDay = new Map<string, Task[]>();
+  for (const date of dates) {
+    const list = open.filter((t) => t.scheduled === date || spansDay(t, date));
+    if (list.length > 0) byDay.set(date, list);
+  }
 
   const plannedByDate = dates.map((d) => (byDay.get(d) ?? []).reduce((sum, t) => sum + t.minutes, 0));
   const ceiling = capacityCeilingMinutes(settings, plannedByDate);
@@ -100,8 +121,7 @@ export function buildWeekPlan(tasks: Task[], todayISO: string, settings: Trackin
 
 /** Metrics for the Next 7 Days `MetricStrip`, computed entirely from real data. */
 export function weekMetrics(tasks: Task[], todayISO: string, week: WeekDayPlan[]): WeekMetrics {
-  const taskCount = week.reduce((sum, d) => sum + d.tasks.length, 0);
-  const plannedMinutes = week.reduce((sum, d) => sum + d.plannedMinutes, 0);
+  const { count: taskCount, minutes: plannedMinutes } = distinctTotals(week);
   // Shared with the Today metric strip (lib/summary.ts) and the project
   // focus band (lib/focus.ts) — a complex task isn't overdue until its
   // finish date passes, not its start day.
@@ -152,7 +172,7 @@ export function weekRows(tasks: Task[], todayISO: string, now: Date, settings: T
   const dayTasks = dates.map((date, i) =>
     i === 0
       ? tasks.filter((t) => t.status === "open" && (isPlanned(t, date) || t.committedOn === date))
-      : tasks.filter((t) => t.status === "open" && t.scheduled === date && !isHiddenUntil(t, date)),
+      : tasks.filter((t) => isPlanned(t, date)),
   );
   const planned = dayTasks.map(sumMinutes);
   const futureCeiling = capacityCeilingMinutes(settings, planned.slice(1));
@@ -188,8 +208,7 @@ export function carriedTasks(tasks: Task[], todayISO: string): Task[] {
 
 /** "14 tasks, 18h 35m planned. Tuesday is over capacity. 2 carried over." */
 export function weekHeadline(rows: WeekRow[], carriedCount: number): string {
-  const total = rows.reduce((n, r) => n + r.tasks.length, 0);
-  const minutes = rows.reduce((n, r) => n + r.plannedMinutes, 0);
+  const { count: total, minutes } = distinctTotals(rows);
   if (total === 0 && carriedCount <= 0) return "Nothing planned in the next 7 days.";
 
   const parts: string[] = [];
