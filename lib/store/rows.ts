@@ -52,6 +52,7 @@ export type TaskRow = {
   start_on?: unknown;
   expires_on?: unknown;
   stage_entered_at?: string | Date | null;
+  recurs_from?: string | null;
 };
 
 export type ProjectRow = {

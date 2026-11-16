@@ -11,7 +11,13 @@ import {
   type SubtaskRow,
   type TaskRow,
 } from "./rows";
-import { doneStageOf, firstOpenStageOf, getStage, renumberStage } from "./stages";
+import {
+  doneStageOf,
+  firstOpenStageOf,
+  getStage,
+  placeInStage,
+  renumberStage,
+} from "./stages";
 
 /** Thrown when a patch would put a task in another project's column; APIs map it to 400. */
 export class TaskInvariantError extends Error {}
@@ -90,7 +96,7 @@ function checkWindow(startOn: string | null | undefined, expiresOn: string | nul
   }
 }
 
-async function insertTask(tx: Tx, input: TaskInput): Promise<Task> {
+async function insertTask(tx: Tx, input: TaskInput, recursFrom?: string): Promise<Task> {
   const stageId = await resolveStage(tx, input.projectId, input.stageId);
   const isComplex = input.isComplex ?? false;
   const scheduled = input.scheduled ?? null;
@@ -100,12 +106,13 @@ async function insertTask(tx: Tx, input: TaskInput): Promise<Task> {
     `insert into tasks
        (id, title, notes, project_id, stage_id, tags, scheduled, due_time, minutes,
         priority, status, recurrence, sort_order, board_order, is_complex, finish_date,
-        committed_on, start_on, expires_on, stage_entered_at)
+        committed_on, start_on, expires_on, stage_entered_at, recurs_from)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'open',$11,
        coalesce((select max(sort_order) + 1 from tasks), 0),
-       coalesce((select max(board_order) + 1 from tasks where stage_id = $5), 0),
+       coalesce((select max(board_order) + 1 from tasks
+                   where stage_id = $5 and status <> 'trashed'), 0),
        $12, $13, $14, $15, $16,
-       case when $5::uuid is null then null else now() end)
+       case when $5::uuid is null then null else now() end, $17)
      returning *`,
     [
       randomUUID(),
@@ -124,6 +131,7 @@ async function insertTask(tx: Tx, input: TaskInput): Promise<Task> {
       input.committedOn ?? null,
       input.startOn ?? null,
       input.expiresOn ?? null,
+      recursFrom ?? null,
     ],
   );
   return (await hydrate(tx, rows))[0];
@@ -293,6 +301,9 @@ export async function updateTask(id: string, patch: Partial<TaskInput>): Promise
       resolveComplex(true, patch.scheduled, current.finishDate, current.dueTime);
     }
 
+    let completing = false;
+    let reopening = false;
+    let leftStageId: string | null = null;
     const projectChanged = patch.projectId !== undefined && (patch.projectId || undefined) !== current.projectId;
     const stageChanged = patch.stageId !== undefined && (patch.stageId || undefined) !== current.stageId;
 
@@ -315,7 +326,8 @@ export async function updateTask(id: string, patch: Partial<TaskInput>): Promise
         stageId
           ? (
               await tx.query<{ next: number }>(
-                `select coalesce(max(board_order)+1, 0) as next from tasks where stage_id = $1`,
+                `select coalesce(max(board_order)+1, 0) as next from tasks
+                  where stage_id = $1 and status <> 'trashed'`,
                 [stageId],
               )
             )[0].next
@@ -323,17 +335,17 @@ export async function updateTask(id: string, patch: Partial<TaskInput>): Promise
       );
 
       // Landing in (or leaving) the done column is the same event as
-      // completing (or reopening) the task.
+      // completing (or reopening) the task; both finish below, after the row
+      // has its new column.
       const doneStage = projectId ? await doneStageOf(tx, projectId) : null;
       if (stageId && doneStage && stageId === doneStage.id) {
-        if (current.status !== "done") {
-          col("status", "done");
-          sets.push(`completed_at = now()`);
-        }
+        completing = current.status === "open";
       } else if (current.status === "done") {
         col("status", "open");
         sets.push(`completed_at = null`);
+        reopening = true;
       }
+      leftStageId = current.stageId && current.stageId !== stageId ? current.stageId : null;
     }
 
     if (sets.length === 0) return current;
@@ -344,13 +356,22 @@ export async function updateTask(id: string, patch: Partial<TaskInput>): Promise
       vals,
     );
     if (rows.length === 0) return null;
+    if (leftStageId) await renumberStage(tx, leftStageId);
+    if (reopening) await releaseSuccessors(tx, id);
+    if (completing) {
+      const done = await finishTask(tx, id);
+      if (done) return done.task;
+    }
     return (await hydrate(tx, rows))[0];
   });
 }
 
 /**
- * Kanban drop: place `id` at `index` within `stageId`, renumbering the column
- * so board order stays dense. Status follows the column, per updateTask.
+ * Kanban drop: place `id` at `index` within `stageId`. `index` is the position
+ * among the column's non-trashed tasks (what the board renders), and board
+ * order is renumbered densely in both columns. Status follows the column: a
+ * drop into Done completes the task (spawning the next occurrence of a
+ * recurring one), a drop of a done task anywhere else reopens it.
  */
 export async function moveTaskToStage(
   id: string,
@@ -366,81 +387,117 @@ export async function moveTaskToStage(
       throw new TaskInvariantError("That column belongs to a different project");
     }
 
+    const landsInDone = stage.kind === "done";
+    if (landsInDone && task.status === "open") {
+      await finishTask(tx, id, { index, stageId });
+      return getTask(id, tx);
+    }
+
     const from = task.stageId;
-    const doneStage = await doneStageOf(tx, task.projectId);
-    const landsInDone = doneStage?.id === stageId;
-
-    const statusFix =
-      landsInDone && task.status !== "done"
-        ? `, status = 'done', completed_at = now()`
-        : !landsInDone && task.status === "done"
-          ? `, status = 'open', completed_at = null`
-          : "";
-
-    // Open a gap at `index`, drop the task into it, then close any gaps left
-    // behind so both columns stay densely ordered.
+    const reopening = !landsInDone && task.status === "done";
     await tx.query(
-      `update tasks set board_order = board_order + 1
-        where stage_id = $1 and id <> $2 and board_order >= $3`,
-      [stageId, id, index],
+      `update tasks set stage_id = $2${
+        reopening ? `, status = 'open', completed_at = null` : ""
+      }${from !== stageId ? `, stage_entered_at = now()` : ""} where id = $1`,
+      [id, stageId],
     );
-    await tx.query(
-      `update tasks set stage_id = $2, board_order = $3${statusFix}${
-        from !== stageId ? `, stage_entered_at = now()` : ""
-      } where id = $1`,
-      [id, stageId, index],
-    );
-    await renumberStage(tx, stageId);
+    await placeInStage(tx, stageId, id, index);
     if (from && from !== stageId) await renumberStage(tx, from);
+    if (reopening) await releaseSuccessors(tx, id);
 
     return getTask(id, tx);
   });
 }
 
-/** Marks done, moves to the done column, and spins up the next occurrence. */
-export async function completeTask(id: string): Promise<{ task: Task; next: Task | null } | null> {
-  const result = await withTransaction(async (tx) => {
-    const task = await getTask(id, tx);
-    if (!task) return null;
+/**
+ * The one "task became done" path: the checkbox, a drop into Done, a patch that
+ * lands in Done, and removing a lane into Done all end here. Sets status and
+ * completed_at, moves a project task to the end of its done lane (or to `index`
+ * for a drag), renumbers the lane it left, and creates the next occurrence of a
+ * recurring task exactly once. A done task is left alone and spawns nothing; a
+ * trashed task cannot be completed (null).
+ */
+export async function finishTask(
+  tx: Tx,
+  id: string,
+  opts: { index?: number; stageId?: string; avoidStageId?: string } = {},
+): Promise<{ task: Task; next: Task | null } | null> {
+  const task = await getTask(id, tx);
+  if (!task || task.status === "trashed") return null;
+  if (task.status === "done") return { task, next: null };
 
-    const doneStage = task.projectId ? await doneStageOf(tx, task.projectId) : null;
-    const rows = await tx.query<TaskRow>(
-      `update tasks
-          set status = 'done', completed_at = now(),
-              stage_entered_at = case when $2::uuid is not null and stage_id is distinct from $2::uuid
-                then now() else stage_entered_at end,
-              stage_id = coalesce($2, stage_id),
-              board_order = case when $2 is null then board_order
-                else coalesce((select max(board_order)+1 from tasks where stage_id = $2), 0) end
-        where id = $1
-        returning *`,
-      [id, doneStage?.id ?? null],
-    );
-    if (rows.length === 0) return null;
-    return { task: (await hydrate(tx, rows))[0], recurrence: task };
-  });
-
-  if (!result) return null;
+  const doneStage = task.projectId ? await doneStageOf(tx, task.projectId) : null;
+  const target = opts.stageId ?? doneStage?.id ?? null;
+  const from = task.stageId ?? null;
+  await tx.query(
+    `update tasks
+        set status = 'done', completed_at = now(),
+            stage_entered_at = case when $2::uuid is not null and stage_id is distinct from $2::uuid
+              then now() else stage_entered_at end,
+            stage_id = coalesce($2::uuid, stage_id)
+      where id = $1`,
+    [id, target],
+  );
+  if (target) {
+    await placeInStage(tx, target, id, opts.index);
+    if (from && from !== target) await renumberStage(tx, from);
+  }
 
   // The follow-up occurrence is a normal create, so it picks up the project's
-  // first open column the same way any other new task does.
-  const source = result.recurrence;
-  const today = toISODate(new Date());
-  const next = source.recurrence
-    ? await addTask({
-        title: source.title,
-        notes: source.notes,
-        projectId: source.projectId,
-        tags: source.tags,
-        scheduled: nextOccurrence(source.scheduled ?? today, source.recurrence, today),
-        dueTime: source.dueTime,
-        minutes: source.minutes,
-        priority: source.priority,
-        recurrence: source.recurrence,
-      })
-    : null;
+  // first open column the same way any other new task does. One that already
+  // links back to this task and is still open means it has been spawned.
+  let next: Task | null = null;
+  if (task.recurrence) {
+    const existing = await tx.query<{ id: string }>(
+      `select id from tasks where recurs_from = $1 and status = 'open' limit 1`,
+      [id],
+    );
+    if (existing.length === 0) {
+      const today = toISODate(new Date());
+      const avoid =
+        opts.avoidStageId && task.projectId
+          ? await firstOpenStageOf(tx, task.projectId, opts.avoidStageId)
+          : null;
+      next = await insertTask(
+        tx,
+        {
+          title: task.title,
+          notes: task.notes,
+          projectId: task.projectId,
+          stageId: avoid?.id,
+          tags: task.tags,
+          scheduled: nextOccurrence(task.scheduled ?? today, task.recurrence, today),
+          dueTime: task.dueTime,
+          minutes: task.minutes,
+          priority: task.priority,
+          recurrence: task.recurrence,
+        },
+        id,
+      );
+    }
+  }
 
-  return { task: result.task, next };
+  return { task: (await getTask(id, tx))!, next };
+}
+
+/** Marks done, moves to the done column, and spins up the next occurrence. */
+export async function completeTask(id: string): Promise<{ task: Task; next: Task | null } | null> {
+  return withTransaction((tx) => finishTask(tx, id));
+}
+
+/**
+ * When a done task becomes open again, its next occurrence goes if nobody has
+ * started it: still open, and no tracked time (timer entries or segments).
+ * A started or finished occurrence is left alone.
+ */
+export async function releaseSuccessors(tx: Tx, id: string): Promise<void> {
+  await tx.query(
+    `delete from tasks t
+      where t.recurs_from = $1 and t.status = 'open'
+        and not exists (select 1 from time_entries e where e.task_id = t.id)
+        and not exists (select 1 from segments s where s.task_id = t.id)`,
+    [id],
+  );
 }
 
 /** Reopening puts a project task back in the first column that isn't done. */
@@ -454,33 +511,67 @@ export async function reopenTask(id: string): Promise<Task | null> {
           set status = 'open', completed_at = null,
               stage_entered_at = case when $2::uuid is not null and stage_id is distinct from $2::uuid
                 then now() else stage_entered_at end,
-              stage_id = coalesce($2, stage_id),
-              board_order = case when $2 is null then board_order
-                else coalesce((select max(board_order)+1 from tasks where stage_id = $2), 0) end
+              stage_id = coalesce($2::uuid, stage_id)
         where id = $1
         returning *`,
       [id, stage?.id ?? null],
     );
     if (rows.length === 0) return null;
-    return (await hydrate(tx, rows))[0];
+    if (stage) {
+      await placeInStage(tx, stage.id, id);
+      if (task.stageId && task.stageId !== stage.id) await renumberStage(tx, task.stageId);
+    }
+    if (task.status === "done") await releaseSuccessors(tx, id);
+    return getTask(id, tx);
   });
 }
 
 export async function trashTask(id: string): Promise<boolean> {
-  const rows = await db.query<TaskRow>(
-    `update tasks set status = 'trashed', deleted_at = now() where id = $1 returning id`,
-    [id],
-  );
-  return rows.length > 0;
+  return withTransaction(async (tx) => {
+    const rows = await tx.query<TaskRow>(
+      `update tasks set status = 'trashed', deleted_at = now() where id = $1 returning *`,
+      [id],
+    );
+    if (rows.length === 0) return false;
+    if (rows[0].stage_id) await renumberStage(tx, rows[0].stage_id);
+    return true;
+  });
 }
 
+/**
+ * Brings a trashed task back as it was: done if it had been completed, open
+ * otherwise, at the end of its column. Never spawns an occurrence. An open task
+ * whose column became Done while it sat in the trash goes to the first open
+ * column instead of being completed.
+ */
 export async function restoreTask(id: string): Promise<Task | null> {
-  const rows = await db.query<TaskRow>(
-    `update tasks set status = 'open', deleted_at = null where id = $1 returning *`,
-    [id],
-  );
-  if (rows.length === 0) return null;
-  return (await hydrate(db, rows))[0];
+  return withTransaction(async (tx) => {
+    const task = await getTask(id, tx);
+    if (!task) return null;
+    if (task.status !== "trashed") return task;
+
+    const status = task.completedAt ? "done" : "open";
+    let stageId = task.stageId ?? null;
+    if (stageId && status === "open") {
+      const lane = await getStage(stageId, tx);
+      if (lane?.kind === "done" && task.projectId) {
+        stageId = (await firstOpenStageOf(tx, task.projectId))?.id ?? stageId;
+      }
+    }
+    await tx.query(
+      `update tasks
+          set status = $2, deleted_at = null, stage_id = $3::uuid,
+              stage_entered_at = case when $3::uuid is not null and stage_id is distinct from $3::uuid
+                then now() else stage_entered_at end
+        where id = $1`,
+      [id, status, stageId],
+    );
+    if (stageId) {
+      await placeInStage(tx, stageId, id);
+      if (task.stageId && task.stageId !== stageId) await renumberStage(tx, task.stageId);
+    }
+    return getTask(id, tx);
+  });
 }
 
 export async function deleteTaskForever(id: string): Promise<boolean> {
