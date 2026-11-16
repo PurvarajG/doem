@@ -1,6 +1,8 @@
 import * as activities from "./activities";
 import * as categories from "./categories";
 import * as dayReviews from "./day-reviews";
+import * as folders from "./folders";
+import * as boardTemplates from "./board-templates";
 import * as note from "./note";
 import * as projects from "./projects";
 import * as quickTodos from "./quick-todos";
@@ -25,6 +27,8 @@ export { CategoryInUse } from "./categories";
 export const store = {
   ...tasks,
   ...projects,
+  ...folders,
+  ...boardTemplates,
   ...stages,
   ...note,
   ...quickTodos,

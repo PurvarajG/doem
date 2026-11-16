@@ -42,6 +42,7 @@ export default function RemoveStageDialog({
     if (!canRemove || busy) return;
     setBusy(true);
     try {
+      // The workspace's removeStage refetches tasks, so moved cards reappear.
       await removeStage(stage.id, destination || siblings[0].id);
       onRemoved(`${stage.name} column removed.`);
       onClose();

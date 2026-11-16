@@ -1,14 +1,58 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTasks } from "@/lib/store-context";
 import { useBoardDrag } from "@/lib/useBoardDrag";
-import type { Project } from "@/lib/types";
+import { readStoredKey } from "@/lib/storage-key";
+import { BOARD_TEMPLATES, guessStageKind, templateSummary } from "@/lib/board-templates";
+import type { Project, ProjectStage } from "@/lib/types";
 import Icon from "../ui/Icon";
 import Column from "./Column";
-import { AddStageDialog } from "./StageDialogs";
+import RemoveStageDialog from "./RemoveStageDialog";
+import { StageLimitDialog } from "./StageDialogs";
+import { openInStage } from "./lanes";
 
 type Fade = "start" | "end" | "both" | undefined;
+
+const STRIP_KEY = "doem.templateStripHidden";
+const stripListeners = new Set<() => void>();
+
+function subscribeStrip(notify: () => void) {
+  stripListeners.add(notify);
+  window.addEventListener("storage", notify);
+  return () => {
+    stripListeners.delete(notify);
+    window.removeEventListener("storage", notify);
+  };
+}
+
+function readHiddenStrips(): string {
+  try {
+    return readStoredKey(STRIP_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Whether this project's "Start from a template" strip has been used or
+ * closed. Remembered in localStorage; if storage fails it simply shows again.
+ */
+function useTemplateStripHidden(projectId: string): [boolean, () => void] {
+  const raw = useSyncExternalStore(subscribeStrip, readHiddenStrips, () => "");
+  const hidden = raw.split(",").includes(projectId);
+  const hide = useCallback(() => {
+    const ids = new Set(readHiddenStrips().split(",").filter(Boolean));
+    ids.add(projectId);
+    try {
+      localStorage.setItem(STRIP_KEY, [...ids].join(","));
+    } catch {
+      // Storage unavailable: the strip comes back next visit.
+    }
+    for (const notify of stripListeners) notify();
+  }, [projectId]);
+  return [hidden, hide];
+}
 
 export default function Board({
   project,
@@ -17,8 +61,20 @@ export default function Board({
   project: Project;
   todayISO: string;
 }) {
-  const { tasks, stagesFor, moveTask, addStage } = useTasks();
+  const {
+    tasks,
+    stagesFor,
+    moveTask,
+    addStage,
+    reorderStages,
+    updateStage,
+    applyBoardTemplate,
+    customTemplates,
+  } = useTasks();
   const [addingLane, setAddingLane] = useState(false);
+  const [laneName, setLaneName] = useState("");
+  const [limitFor, setLimitFor] = useState<ProjectStage | null>(null);
+  const [removing, setRemoving] = useState<ProjectStage | null>(null);
   /** Announced politely after a move, whether it came from drag or keyboard. */
   const [announcement, setAnnouncement] = useState("");
   const [fade, setFade] = useState<Fade>(undefined);
@@ -42,6 +98,10 @@ export default function Board({
       list.sort((a, b) => a.boardOrder - b.boardOrder);
     return map;
   }, [tasks, stages, project.id]);
+
+  const isEmpty = [...byStage.values()].every((list) => list.length === 0);
+  const [stripHidden, hideStrip] = useTemplateStripHidden(project.id);
+  const templates = [...BOARD_TEMPLATES, ...customTemplates];
 
   const measure = useCallback(() => {
     const el = scrollRef.current;
@@ -88,8 +148,68 @@ export default function Board({
 
   const { dragTaskId, target, cardProps, columnProps } = useBoardDrag(onMove);
 
+  /** The server places a new column just before Done. */
+  async function createLane(keepOpen: boolean) {
+    const name = laneName.trim().slice(0, 80);
+    setLaneName("");
+    if (!keepOpen) setAddingLane(false);
+    if (!name) return;
+    const created = await addStage(project.id, { name, kind: guessStageKind(name) });
+    if (created) setAnnouncement(`${name} column added.`);
+  }
+
+  function swap(index: number, offset: -1 | 1) {
+    const ids = stages.map((s) => s.id);
+    const other = index + offset;
+    [ids[index], ids[other]] = [ids[other], ids[index]];
+    void reorderStages(project.id, ids);
+  }
+
+  const openColumns = stages.filter((s) => s.kind !== "done").length;
+  const currentTemplate = templates.find(
+    (t) =>
+      t.stages.length === stages.length &&
+      t.stages.every((s, i) => s.name === stages[i].name),
+  )?.id;
+
   return (
     <>
+      {isEmpty && !stripHidden && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-meta text-ink-3">Start from a template:</span>
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              title={templateSummary(t)}
+              aria-pressed={currentTemplate === t.id}
+              onClick={async () => {
+                if (await applyBoardTemplate(project.id, t.id)) {
+                  hideStrip();
+                  setAnnouncement(`${t.name} template applied.`);
+                }
+              }}
+              className={`h-8 rounded-full px-3 text-secondary inset-ring-1 hover:bg-sunk ${
+                currentTemplate === t.id
+                  ? "text-ink inset-ring-line-strong"
+                  : "text-ink-2 inset-ring-line-2"
+              }`}
+            >
+              {t.name}
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-label="Hide templates"
+            title="Hide. Templates stay in Project settings."
+            onClick={hideStrip}
+            className="grid size-8 place-items-center rounded-full text-ink-3 hover:bg-sunk hover:text-ink"
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+      )}
+
       {/* The only horizontal scroller on the page. The p-1 -m-1 gutter keeps lane edges and card shadows from being clipped. */}
       <div
         ref={scrollRef}
@@ -99,7 +219,7 @@ export default function Board({
       >
         <div className="flex min-w-full items-start gap-4">
           <div className="grid flex-1 auto-cols-[minmax(14rem,1fr)] grid-flow-col items-start gap-4">
-            {stages.map((stage) => (
+            {stages.map((stage, index) => (
               <Column
                 key={stage.id}
                 stage={stage}
@@ -112,19 +232,47 @@ export default function Board({
                 cardProps={cardProps}
                 columnProps={columnProps}
                 onMove={onMove}
+                laneActions={{
+                  moveLeft: index > 0 ? () => swap(index, -1) : undefined,
+                  moveRight: index < stages.length - 1 ? () => swap(index, 1) : undefined,
+                  setLimit: () => setLimitFor(stage),
+                  remove:
+                    stage.kind !== "done" && openColumns > 1
+                      ? () => setRemoving(stage)
+                      : undefined,
+                }}
               />
             ))}
           </div>
 
-          <button
-            type="button"
-            aria-label="Add lane"
-            title="Add lane"
-            onClick={() => setAddingLane(true)}
-            className="grid size-10 shrink-0 place-items-center rounded-tab text-ink-3 inset-ring-1 inset-ring-line-2 hover:bg-sunk"
-          >
-            <Icon name="plus" />
-          </button>
+          {addingLane ? (
+            <input
+              autoFocus
+              value={laneName}
+              onChange={(e) => setLaneName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void createLane(true);
+                if (e.key === "Escape") {
+                  setLaneName("");
+                  setAddingLane(false);
+                }
+              }}
+              onBlur={() => void createLane(false)}
+              placeholder="Column name, then Enter"
+              aria-label="New column name"
+              className="h-10 w-56 shrink-0 rounded-tab bg-surface px-3 text-body text-ink ring-1 ring-line placeholder:text-ink-3"
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label="Add lane"
+              title="Add lane"
+              onClick={() => setAddingLane(true)}
+              className="grid size-10 shrink-0 place-items-center rounded-tab text-ink-3 inset-ring-1 inset-ring-line-2 hover:bg-sunk"
+            >
+              <Icon name="plus" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -132,14 +280,24 @@ export default function Board({
         {announcement}
       </p>
 
-      <AddStageDialog
-        open={addingLane}
-        onClose={() => setAddingLane(false)}
-        onAdd={async (name, kind) => {
-          await addStage(project.id, { name, kind });
-          setAnnouncement(`${name} column added.`);
+      <StageLimitDialog
+        stage={limitFor}
+        open={limitFor ? openInStage(byStage.get(limitFor.id) ?? [], limitFor.id) : 0}
+        onClose={() => setLimitFor(null)}
+        onSave={async (limit) => {
+          if (limitFor) await updateStage(limitFor.id, { wipLimit: limit });
         }}
       />
+
+      {removing && (
+        <RemoveStageDialog
+          stage={removing}
+          siblings={stages.filter((s) => s.id !== removing.id)}
+          taskCount={byStage.get(removing.id)?.length ?? 0}
+          onClose={() => setRemoving(null)}
+          onRemoved={(message) => setAnnouncement(message)}
+        />
+      )}
     </>
   );
 }

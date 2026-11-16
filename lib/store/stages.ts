@@ -218,6 +218,58 @@ export async function removeStage(id: string, destinationId: string): Promise<bo
 }
 
 /**
+ * Swaps a board's columns for a template's. No task is lost: each old open
+ * column's tasks move to the new open column with the same name, else the first
+ * of the same kind, else the first open column. The old done column is kept
+ * and renamed (a project may only ever have one), so done tasks stay put.
+ */
+export async function applyStageTemplate(
+  projectId: string,
+  template: StageInput[],
+): Promise<ProjectStage[]> {
+  const doneTemplate = template.filter((s) => s.kind === "done");
+  if (doneTemplate.length !== 1 || template.length < 2) {
+    throw new Invalid("A board template needs exactly one done column and at least one other");
+  }
+  return withTransaction(async (tx) => {
+    const old = await stagesOf(tx, projectId);
+    const oldDone = old.find((s) => s.kind === "done");
+
+    const created: ProjectStage[] = [];
+    for (const [i, input] of template.entries()) {
+      if (input.kind === "done" && oldDone) {
+        const rows = await tx.query<StageRow>(
+          `update project_stages set name = $1, sort_order = $2 where id = $3 returning *`,
+          [input.name, i, oldDone.id],
+        );
+        created.push(rowToStage(rows[0]));
+        continue;
+      }
+      const rows = await tx.query<StageRow>(
+        `insert into project_stages (id, project_id, name, kind, sort_order)
+         values ($1,$2,$3,$4,$5) returning *`,
+        [randomUUID(), projectId, input.name, input.kind, i],
+      );
+      created.push(rowToStage(rows[0]));
+    }
+
+    // Only open columns are left to move from, and they only ever land in an
+    // open column, so switching templates never completes a task.
+    const open = created.filter((s) => s.kind !== "done");
+    for (const stage of old) {
+      if (stage.id === oldDone?.id) continue;
+      const destination =
+        open.find((s) => s.name.toLowerCase() === stage.name.toLowerCase()) ??
+        open.find((s) => s.kind === stage.kind) ??
+        open[0];
+      await moveTasksToStage(tx, stage.id, destination);
+      await tx.query(`delete from project_stages where id = $1`, [stage.id]);
+    }
+    return created;
+  });
+}
+
+/**
  * Shared by stage removal and project deletion: relocate tasks, fixing status.
  * Open tasks moving into a done lane are completed through the same path as
  * the checkbox (so recurring ones spawn their next occurrence); done tasks

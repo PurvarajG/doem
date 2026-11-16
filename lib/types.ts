@@ -124,12 +124,22 @@ export type Project = {
   sortOrder: number;
   createdAt: string;
   defaultCategoryId?: string;
+  folderId?: string;
 };
 
 export type ProjectInput = {
   name: string;
   color?: string;
   defaultCategoryId?: string;
+  folderId?: string;
+};
+
+/** A sidebar group of projects, such as an area like Work or Home. */
+export type Folder = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
 };
 
 /** There is exactly one general note, and this is its primary key. */

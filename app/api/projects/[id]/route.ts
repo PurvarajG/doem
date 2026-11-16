@@ -13,6 +13,10 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/projects/[
       ...(b.defaultCategoryId !== undefined
         ? { defaultCategoryId: v.optionalUuid(b.defaultCategoryId, "defaultCategoryId") ?? "" }
         : {}),
+      // "" or null moves the project out of its folder.
+      ...(b.folderId !== undefined
+        ? { folderId: b.folderId ? v.uuid(b.folderId, "folderId") : "" }
+        : {}),
     });
   });
 }

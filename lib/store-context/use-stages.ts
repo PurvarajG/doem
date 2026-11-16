@@ -8,7 +8,8 @@ export type StagesApi = {
   stages: ProjectStage[];
   setStages: React.Dispatch<React.SetStateAction<ProjectStage[]>>;
   stagesFor: (projectId: string) => ProjectStage[];
-  addStage: (projectId: string, input: StageInput) => Promise<void>;
+  /** Resolves to the new column, or null when it couldn't be saved. */
+  addStage: (projectId: string, input: StageInput) => Promise<ProjectStage | null>;
   renameStage: (id: string, name: string) => Promise<void>;
   reorderStages: (projectId: string, ids: string[]) => Promise<void>;
   removeStage: (id: string, moveTo: string) => Promise<void>;
@@ -42,7 +43,7 @@ export function useStages(onError: (message: string) => void): StagesApi {
         });
       } catch (error) {
         onError((error as Error).message);
-        return;
+        return null;
       }
       // The server may have shifted other lanes (a new lane lands before Done),
       // so take its order for the project. If that read fails the new lane is
@@ -56,6 +57,7 @@ export function useStages(onError: (message: string) => void): StagesApi {
       } catch {
         setStages((prev) => [...prev, created]);
       }
+      return created;
     },
     [onError],
   );
