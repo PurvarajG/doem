@@ -1,13 +1,13 @@
 import type { IconName } from "@/components/ui/Icon";
 
 /** Bump when the list below changes, so the sheet opens once more for everyone. */
-export const WHATS_NEW_VERSION = "1.0.4";
+export const WHATS_NEW_VERSION = "1.1.0";
 export const WHATS_NEW_SEEN_KEY = "doem.whatsNewSeen";
 /** Dispatched on window to open the sheet from anywhere (the profile menu). */
 export const WHATS_NEW_OPEN_EVENT = "doem:whats-new";
 
 /** Where "Show me" goes. `project` means the first active project's board. */
-export type WhatsNewTarget = "project" | "inbox" | "upcoming" | "archived";
+export type WhatsNewTarget = "project" | "inbox" | "upcoming" | "archived" | "tracking";
 
 export type WhatsNewItem = {
   icon: IconName;
@@ -18,35 +18,31 @@ export type WhatsNewItem = {
 
 export const WHATS_NEW: { title: string; items: WhatsNewItem[] }[] = [
   {
-    title: "Projects",
+    title: "Tracking",
     items: [
       {
-        icon: "folder",
-        title: "Sort projects into folders",
-        body: "Click New folder in the sidebar, then drag projects onto it, or pick a folder in Project settings. Click a folder to fold it away.",
+        icon: "clock",
+        title: "Fill a gap the way it happened",
+        body: "Type a time to cut a gap into parts, then say what you did in each. Nothing is picked for you, and parts you leave empty stay as gaps.",
+        target: "tracking",
       },
-    ],
-  },
-  {
-    title: "Boards",
-    items: [
       {
-        icon: "board",
-        title: "Edit columns right on the board",
-        body: "Click a column name to rename it. Its menu moves, limits or deletes it. + adds a column: type a name and press Enter.",
-        target: "project",
+        icon: "monitor",
+        title: "Doem remembers when your Mac slept",
+        body: "Lock and sleep times show as hints when you fill a gap, such as Mac locked 23:52. Tap one to cut there; ignore it and nothing changes.",
+        target: "tracking",
+      },
+      {
+        icon: "moon",
+        title: "Last night is one gap",
+        body: "The morning's first gap now starts where last night's last entry ended, not at a fixed hour.",
+        target: "tracking",
       },
       {
         icon: "list",
-        title: "Start a board from a template",
-        body: "An empty board offers Standard, Simple, Software, Content and Pipeline. Switching later keeps every task.",
-        target: "project",
-      },
-      {
-        icon: "plus",
-        title: "Save your own templates",
-        body: "Project settings > Board template > Save these columns as a template. It shows up on every new board.",
-        target: "project",
+        title: "Entries show what you did",
+        body: "An entry without a task is named by its description, with its category as a coloured dot.",
+        target: "tracking",
       },
     ],
   },
