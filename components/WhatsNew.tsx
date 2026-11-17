@@ -47,6 +47,7 @@ export default function WhatsNew() {
     if (target === "project") return project ? `/projects/${project.id}` : null;
     if (target === "inbox") return "/inbox";
     if (target === "upcoming") return "/upcoming";
+    if (target === "tracking") return "/tracking";
     return "/settings#projects";
   };
 

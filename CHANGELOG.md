@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-11-17
+
+### Added
+- Fill a gap in parts. Type a time to cut a gap, then give each part a description and a category or task. Parts left without one stay as gaps.
+- Doem now records when your Mac was locked or asleep, whether or not a timer runs, and keeps the last 14 days on this Mac. When you fill a gap these show as hints (Mac locked, Mac unlocked, Mac asleep, Mac woke) next to your usual wake time. A hint changes nothing until you tap it.
+- What's new lists these changes once after the update.
+
+### Changed
+- The gap form asks "What did you do?" first and no longer picks a category for you.
+- A day's first gap starts where the previous day's last entry ended, so last night is one gap on the morning's page. If the previous day has no entries, it starts at the day start. Gaps are no longer cut at the waking hours, and a past day shows no gap after its last entry.
+- Gaps that began the night before are labelled Overnight.
+- An entry without a task or activity is named by its description, not its category. Recent entries shows the category as a coloured dot, a task's or activity's note on a second line, and the description first when editing.
+- The waking hours in Settings now only set the usual-wake hint, capacity and the calendar.
+
+### Known issues
+- Lock and sleep times are only recorded while Doem is running.
+- The Day ribbon's own editor still calls the description a note.
+- Whether a board's template row was closed is remembered on this Mac only. If Doem's local storage is cleared, the row can show again on boards that are still empty.
+- On Today, a task row's hover buttons cover its commit target, so committing with the mouse doesn't work there. Point at the task and press `*`.
+- Reopening a repeating task removes its unstarted next one, including any subtasks you added to that next one.
+- Un-archiving a project whose name was reused leaves two active projects with the same name.
+
 ## [1.0.4] - 2026-11-16
 
 ### Added

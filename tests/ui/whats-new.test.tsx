@@ -38,8 +38,8 @@ describe("WhatsNew", () => {
   test("opens by itself the first time and lists every change", () => {
     render(<WhatsNew />);
     expect(screen.getByRole("dialog", { name: "What's new" })).toBeInTheDocument();
-    expect(screen.getByText("Sort projects into folders")).toBeInTheDocument();
-    expect(screen.getByText("Save your own templates")).toBeInTheDocument();
+    expect(screen.getByText("Fill a gap the way it happened")).toBeInTheDocument();
+    expect(screen.getByText("Entries show what you did")).toBeInTheDocument();
   });
 
   test("waits for the store before opening", () => {
@@ -67,11 +67,11 @@ describe("WhatsNew", () => {
     expect(screen.getByRole("dialog", { name: "What's new" })).toBeInTheDocument();
   });
 
-  test("Show me goes to the first active project and closes the sheet", async () => {
+  test("Show me goes to Tracking and closes the sheet", async () => {
     const user = userEvent.setup();
     render(<WhatsNew />);
-    await user.click(screen.getByRole("button", { name: "Show me: Edit columns right on the board" }));
-    expect(push).toHaveBeenCalledWith("/projects/p1");
+    await user.click(screen.getByRole("button", { name: "Show me: Fill a gap the way it happened" }));
+    expect(push).toHaveBeenCalledWith("/tracking");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
