@@ -10,8 +10,9 @@ import { fmt, fmtClock, fmtDate } from "@/lib/format";
 import { addDays, toISODate } from "@/lib/parse";
 import { useTasks } from "@/lib/store-context";
 import type { Segment } from "@/lib/types";
+import CategoryDot from "../CategoryDot";
 import CategoryPicker from "../CategoryPicker";
-import { segmentLabel, segmentSubject } from "../segment-label";
+import { segmentSubject } from "../segment-label";
 import TaskPicker from "../TaskPicker";
 
 const TH = "bg-sunk px-3 py-2.5 text-left font-mono text-caption font-normal uppercase tracking-caption text-ink-3";
@@ -88,7 +89,7 @@ export default function RecordsModule({ now, dayISO, todayISO }: { now: Date; da
             <table className="w-full border-collapse text-secondary">
               <thead>
                 <tr>
-                  <th className={`${TH} rounded-l-tab`}>Task</th>
+                  <th className={`${TH} rounded-l-tab`}>Entry</th>
                   <th className={TH}>Project</th>
                   <th className={TH}>Started</th>
                   <th className={TH}>Source</th>
@@ -101,6 +102,7 @@ export default function RecordsModule({ now, dayISO, todayISO }: { now: Date; da
               <tbody>
                 {rows.map((segment) => {
                   const subject = segmentSubject(segment, categories, activities, tasks, projects);
+                  const category = categories.find((c) => c.id === segment.categoryId);
                   const src = source(segment);
                   const minutes = Math.max(
                     0,
@@ -113,17 +115,28 @@ export default function RecordsModule({ now, dayISO, todayISO }: { now: Date; da
                   return (
                     <Fragment key={segment.id}>
                       <tr className="group">
-                        <td className={`${TD} text-ink`}>
-                          {subject.task ? (
-                            <button
-                              type="button"
-                              onClick={() => openTask(subject.task!.id)}
-                              className="text-left hover:underline"
-                            >
-                              {subject.label}
-                            </button>
-                          ) : (
-                            subject.label
+                        <td className={`${TD} w-1/2 max-w-0 text-ink`}>
+                          <div className="flex min-w-0 items-center gap-2">
+                            {category && <CategoryDot color={category.color} label={category.name} />}
+                            {subject.task ? (
+                              <button
+                                type="button"
+                                onClick={() => openTask(subject.task!.id)}
+                                title={subject.label}
+                                className="min-w-0 truncate text-left hover:underline"
+                              >
+                                {subject.label}
+                              </button>
+                            ) : (
+                              <span title={subject.label} className="min-w-0 truncate">
+                                {subject.label}
+                              </span>
+                            )}
+                          </div>
+                          {subject.secondary && (
+                            <div title={subject.secondary} className="mt-0.5 truncate pl-4 text-meta text-ink-3">
+                              {subject.secondary}
+                            </div>
                           )}
                         </td>
                         <td className={`${TD} text-ink`}>
@@ -164,6 +177,17 @@ export default function RecordsModule({ now, dayISO, todayISO }: { now: Date; da
                         <tr>
                           <td colSpan={6} className="border-b border-line px-3 py-3">
                             <div className="flex flex-wrap items-center gap-2">
+                              <Input
+                                wrapperClassName="min-w-48 flex-1 basis-full"
+                                defaultValue={segment.note ?? ""}
+                                placeholder="What did you do?"
+                                aria-label={`What did you do, ${startedLabel(segment.startedAt, todayISO)}`}
+                                onBlur={(e) => {
+                                  if (e.target.value !== (segment.note ?? "")) {
+                                    patchSegment(segment.id, { note: e.target.value });
+                                  }
+                                }}
+                              />
                               <CategoryPicker
                                 categories={categories}
                                 value={segment.categoryId}
@@ -178,17 +202,6 @@ export default function RecordsModule({ now, dayISO, todayISO }: { now: Date; da
                                 onChange={(taskId) =>
                                   patchSegment(segment.id, { taskId, activityId: taskId ? "" : undefined })
                                 }
-                              />
-                              <Input
-                                wrapperClassName="min-w-48 flex-1"
-                                defaultValue={segment.note ?? ""}
-                                placeholder="Note"
-                                aria-label={`Note for ${segmentLabel(segment, categories, activities, tasks)}`}
-                                onBlur={(e) => {
-                                  if (e.target.value !== (segment.note ?? "")) {
-                                    patchSegment(segment.id, { note: e.target.value });
-                                  }
-                                }}
                               />
                               <Button variant="chip" onClick={() => setEditingId(null)}>
                                 Done
