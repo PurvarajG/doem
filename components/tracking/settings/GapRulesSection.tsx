@@ -21,13 +21,14 @@ export default function GapRulesSection() {
       <HourRow
         id="gap-awake-from"
         label="Awake from"
+        description="Offered as a wake-time hint when you fill an overnight gap."
         value={settings.wakingStartHour}
         onChange={(wakingStartHour) => patchSettings({ wakingStartHour })}
       />
       <HourRow
         id="gap-awake-until"
         label="Awake until"
-        description="Gaps are only looked for in this window."
+        description="Used for capacity and the calendar."
         value={settings.wakingEndHour}
         onChange={(wakingEndHour) => patchSettings({ wakingEndHour })}
       />

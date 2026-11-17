@@ -8,7 +8,7 @@ function minutesBetween(fromISO: string, toISO: string): number {
 }
 
 /**
- * Tracked minutes ÷ waking minutes elapsed so far. For a past day the whole
+ * Tracked waking minutes ÷ waking minutes elapsed so far. For a past day the whole
  * waking window has elapsed; for today, only up to now; a future day hasn't
  * started yet.
  */
@@ -24,7 +24,15 @@ export function coveragePercent(
   const elapsedMinutes = Math.max(0, (elapsedEnd.getTime() - wakeStart.getTime()) / 60_000);
   if (elapsedMinutes === 0) return 0;
 
-  const tracked = segments.reduce((sum, s) => sum + minutesBetween(s.startedAt, s.endedAt ?? now.toISOString()), 0);
+  // Only the part of each entry inside the elapsed waking window counts, so a
+  // logged night's sleep doesn't inflate coverage.
+  const windowStart = wakeStart.getTime();
+  const windowEnd = elapsedEnd.getTime();
+  const tracked = segments.reduce((sum, s) => {
+    const start = Math.max(new Date(s.startedAt).getTime(), windowStart);
+    const end = Math.min(new Date(s.endedAt ?? now.toISOString()).getTime(), windowEnd);
+    return sum + Math.max(0, end - start) / 60_000;
+  }, 0);
   return Math.min(100, Math.round((tracked / elapsedMinutes) * 100));
 }
 

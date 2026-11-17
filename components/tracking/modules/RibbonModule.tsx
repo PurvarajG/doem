@@ -189,7 +189,7 @@ export default function RibbonModule({ dayISO, isToday }: { dayISO: string; isTo
       {selected && (
         <div className="flex flex-wrap items-center gap-2 rounded-row bg-sunk p-3">
           {selected.kind === "gap" ? (
-            <GapFillForm gap={selected.gap} onFilled={() => setSelected(null)} />
+            <GapFillForm gap={selected.gap} dayISO={dayISO} onFilled={() => setSelected(null)} />
           ) : (
             <SegmentEditor
               segment={selected.segment}

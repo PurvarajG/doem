@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { fmt, fmtClock } from "@/lib/format";
 import { useTasks } from "@/lib/store-context";
-import { wakingWindow } from "@/lib/tracking-day";
+import { dayWindow } from "@/lib/tracking-day";
 import type { Gap, TrackingSettings } from "@/lib/types";
 import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
@@ -13,12 +13,9 @@ import { presetChips } from "../presets";
 
 const ITEM = "inline-flex items-center gap-1 whitespace-nowrap";
 
-/** A gap right at the edge of the waking window reads as an overnight boundary, not a mid-day hole. */
+/** A gap that began before this tracking day started carries over from last night. */
 function edgeLabel(gap: Gap, settings: TrackingSettings, dayISO: string): string | null {
-  const { start: wakeStart, end: wakeEnd } = wakingWindow(dayISO, settings);
-  if (new Date(gap.startedAt).getTime() === wakeStart.getTime()) return "Since waking";
-  if (new Date(gap.endedAt).getTime() >= wakeEnd.getTime()) return "Into the night";
-  return null;
+  return new Date(gap.startedAt) < dayWindow(dayISO, settings).start ? "Overnight" : null;
 }
 
 /** Gaps today: what is missing from the day, and one tap to fill it. Renders the body only. */
@@ -70,7 +67,7 @@ export default function GapsTodayModule({ dayISO }: { dayISO: string }) {
               </Button>
             </div>
 
-            {expanded === key && <GapFillForm gap={gap} onFilled={() => setExpanded(null)} />}
+            {expanded === key && <GapFillForm gap={gap} dayISO={dayISO} onFilled={() => setExpanded(null)} />}
           </li>
         );
       })}
