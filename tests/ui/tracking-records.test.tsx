@@ -86,7 +86,7 @@ describe("RecordsModule (Recent entries)", () => {
     await mountWith(SEGMENTS);
     expect(await screen.findByText("Recent entries")).toBeTruthy();
     await screen.findByText("Today 13:18");
-    for (const col of ["Task", "Project", "Started", "Source", "Duration"]) {
+    for (const col of ["Entry", "Project", "Started", "Source", "Duration"]) {
       expect(screen.getByRole("columnheader", { name: col })).toBeTruthy();
     }
     await screen.findByText("Today 13:18");
@@ -171,12 +171,13 @@ describe("RecordsModule (Recent entries)", () => {
     );
   });
 
-  test("note saves on blur only when changed", async () => {
+  test("the description saves on blur only when changed, and is the edit row's first field", async () => {
     const { mock } = await mountWith([{ ...SEGMENTS[1], note: "first" }]);
     await screen.findByText("Timer");
     await userEvent.click(screen.getByRole("button", { name: "Edit entry" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    const note = screen.getByPlaceholderText("Note");
+    const note = screen.getByPlaceholderText("What did you do?");
+    expect(note.closest("div[data-variant]")?.parentElement?.firstElementChild).toBe(note.closest("div[data-variant]"));
     note.focus();
     fireEvent.blur(note);
     expect(mock.calls.filter((c) => c.method === "PATCH")).toHaveLength(0);
@@ -206,5 +207,31 @@ describe("RecordsModule (Recent entries)", () => {
   test("another day shows its date in the header", async () => {
     await mountWith([], "2026-02-27");
     expect(await screen.findByText("Fri 27 Feb")).toBeTruthy();
+  });
+
+  test("an entry with no task is titled by its description, behind a dot naming its category", async () => {
+    await mountWith([{ ...SEGMENTS[1], note: "Walked to the shop" }]);
+    const row = (await screen.findAllByRole("row"))[1];
+    await within(row).findByText("Walked to the shop");
+    expect(within(row).getByRole("img", { name: "Admin" })).toBeTruthy();
+    expect(within(row).queryByText("Admin")).toBeNull();
+  });
+
+  test("a task entry shows its note on a second line", async () => {
+    await mountWith([{ ...SEGMENTS[0], endedAt: at(2026, 3, 1, 13, 48), note: "Slides 1 to 8" }]);
+    const row = (await screen.findAllByRole("row"))[1];
+    await within(row).findByRole("button", { name: "Write the plan" });
+    expect(within(row).getByText("Slides 1 to 8").className).toContain("text-meta");
+    expect(within(row).getByRole("img", { name: "Focus Work" })).toBeTruthy();
+  });
+
+  test("a long multi-line description shows only its first line, truncated, with that line in the title", async () => {
+    const first = "A".repeat(300);
+    await mountWith([{ ...SEGMENTS[1], note: `${first}\nsecond line` }]);
+    const row = (await screen.findAllByRole("row"))[1];
+    const title = await within(row).findByText(first);
+    expect(title.className).toContain("truncate");
+    expect(title.getAttribute("title")).toBe(first);
+    expect(row.textContent).not.toContain("second line");
   });
 });
