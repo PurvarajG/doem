@@ -305,56 +305,61 @@ function hourOnDay(dayISO: string, hour: number): Date {
  * span still visible tomorrow morning without anything having run overnight.
  * `dayISO` is the day the tracking window *starts* on: with a 04:00 day
  * boundary, a 1am session still belongs to the previous day.
+ *
+ * Every untracked minute belongs to exactly one gap on exactly one day:
+ * - the day's first gap starts where the previous tracking day's last entry
+ *   ended (so an overnight hole is one block on the morning's page), or at
+ *   the day start when the previous day has no entries;
+ * - a past day shows no gap after its last entry, since that time opens the
+ *   next day's first gap;
+ * - today's trailing gap runs to now unless a timer is running;
+ * - a future day has no gaps.
+ * Gap edges are never clipped to the waking hours: where a gap starts is the
+ * user's call, made in the fill form.
  */
 export async function findGaps(dayISO: string, settings: TrackingSettings): Promise<Gap[]> {
   const dayStart = hourOnDay(dayISO, settings.dayStartHour);
   const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-  const wakeStart = hourOnDay(dayISO, settings.wakingStartHour);
-  const wakeEnd = hourOnDay(dayISO, settings.wakingEndHour);
+  const lookback = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
+  const now = new Date();
+  if (dayStart >= now) return [];
 
-  const rows = await db.query<{ gap_start: string; gap_end: string }>(
-    `with bounds as (select $1::timestamptz as day_start, $2::timestamptz as day_end),
-          ordered as (
-            select started_at, ended_at,
-                   lag(ended_at) over (order by started_at) as prev_end
-              from segments, bounds
-             where started_at < bounds.day_end
-               and coalesce(ended_at, now()) > bounds.day_start
-          )
-     select coalesce(prev_end, (select day_start from bounds)) as gap_start,
-            started_at as gap_end
-       from ordered
-      where started_at > coalesce(prev_end, (select day_start from bounds))`,
-    [dayStart.toISOString(), dayEnd.toISOString()],
-  );
-
-  const spans = rows.map((r) => ({ start: new Date(r.gap_start), end: new Date(r.gap_end) }));
-
-  const [{ last_end, has_running }] = await db.query<{ last_end: string | null; has_running: boolean | null }>(
-    `select max(ended_at) as last_end, bool_or(ended_at is null) as has_running
+  const rows = await db.query<{ started_at: string; ended_at: string | null }>(
+    `select started_at, ended_at
        from segments
-      where started_at < $2 and coalesce(ended_at, now()) > $1`,
-    [dayStart.toISOString(), dayEnd.toISOString()],
+      where started_at < $2 and coalesce(ended_at, now()) > $1
+      order by started_at asc`,
+    [lookback.toISOString(), dayEnd.toISOString()],
   );
+  const segs = rows.map((r) => ({
+    start: new Date(r.started_at).getTime(),
+    end: r.ended_at ? new Date(r.ended_at).getTime() : now.getTime(),
+    running: r.ended_at === null,
+  }));
 
-  // Nothing untracked trails a currently-running segment — it covers up to now.
-  if (!has_running) {
-    const now = new Date();
-    const trailingStart = last_end ? new Date(last_end) : dayStart;
-    const trailingEnd = now < dayEnd ? now : dayEnd;
-    if (trailingStart < trailingEnd) spans.push({ start: trailingStart, end: trailingEnd });
+  const before = segs.filter((s) => s.start < dayStart.getTime());
+  const inDay = segs.filter((s) => s.start >= dayStart.getTime());
+
+  let cursor = before.length ? Math.max(...before.map((s) => s.end)) : dayStart.getTime();
+  const spans: { start: number; end: number }[] = [];
+  for (const s of inDay) {
+    if (s.start > cursor) spans.push({ start: cursor, end: s.start });
+    cursor = Math.max(cursor, s.end);
+  }
+
+  const isToday = now < dayEnd;
+  const running = segs.some((s) => s.running);
+  if (isToday) {
+    if (!running && cursor < now.getTime()) spans.push({ start: cursor, end: now.getTime() });
+  } else if (inDay.length === 0 && cursor < dayEnd.getTime()) {
+    spans.push({ start: cursor, end: dayEnd.getTime() });
   }
 
   return spans
+    .filter((s) => s.end - s.start >= settings.minGapMinutes * 60_000)
     .map((s) => ({
-      start: s.start < wakeStart ? wakeStart : s.start,
-      end: s.end > wakeEnd ? wakeEnd : s.end,
-    }))
-    .filter((s) => s.end.getTime() - s.start.getTime() >= settings.minGapMinutes * 60_000)
-    .map((s) => ({
-      startedAt: s.start.toISOString(),
-      endedAt: s.end.toISOString(),
-      minutes: Math.round((s.end.getTime() - s.start.getTime()) / 60_000),
-    }))
-    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+      startedAt: new Date(s.start).toISOString(),
+      endedAt: new Date(s.end).toISOString(),
+      minutes: Math.round((s.end - s.start) / 60_000),
+    }));
 }

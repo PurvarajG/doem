@@ -35,6 +35,18 @@ test("desktop ipc handlers are registered once each", () => {
     assert.equal(count(new RegExp(`ipcMain\\.on\\("${channel}"`, "g")), 1, channel);
   }
   assert.equal(count(/ipcMain\.handle\("doem:get-capture-status"/g), 1);
+  assert.equal(count(/ipcMain\.handle\("doem:get-presence"/g), 1);
+});
+
+test("presence is logged on lock, sleep, wake and unlock, timer or not", () => {
+  assert.ok(main.includes('require("./presence-log")'));
+  const start = main.indexOf("function startDesktopExtras");
+  const body = main.slice(start, main.indexOf('app.on("will-quit"', start));
+  assert.match(body, /on\("lock-screen"[\s\S]*?presenceLog\.away\(new Date\(\), "lock"\)/);
+  assert.match(body, /on\("suspend"[\s\S]*?presenceLog\.away\(new Date\(\), "suspend"\)/);
+  assert.match(body, /on\("resume"[\s\S]*?if \(!screenLocked\) presenceLog\.back\(new Date\(\)\)/);
+  assert.match(body, /on\("unlock-screen"[\s\S]*?presenceLog\.back\(new Date\(\)\)/);
+  assert.match(main, /path\.join\(userDataDir\(\), "presence-log\.json"\)/);
 });
 
 test("main uses the wave-1 modules", () => {

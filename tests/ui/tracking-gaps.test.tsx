@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import GapsToday from "@/components/tracking/modules/UnaccountedModule";
@@ -58,13 +58,15 @@ describe("Gaps today module", () => {
     await setup();
     expect(await screen.findByText("12:00 to 13:30")).toBeInTheDocument();
     expect(screen.getByText("1h 30m")).toBeInTheDocument();
-    expect(screen.getByText("Choose what you were doing")).toBeInTheDocument();
+    // No gap here began before the day start, so none is labelled Overnight.
+    expect(screen.getAllByText("Choose what you were doing")).toHaveLength(3);
   });
 
-  test("edge gaps carry Since waking and Into the night", async () => {
-    await setup();
-    expect(await screen.findByText("Since waking")).toBeInTheDocument();
-    expect(screen.getByText("Into the night")).toBeInTheDocument();
+  test("a gap that began before the day started is labelled Overnight", async () => {
+    const overnight = { startedAt: new Date(2026, 1, 28, 23, 40).toISOString(), endedAt: at(8, 15), minutes: 515 };
+    await setup([overnight, GAPS[1]]);
+    expect(await screen.findByText("Overnight")).toBeInTheDocument();
+    expect(screen.getAllByText("Choose what you were doing")).toHaveLength(1);
   });
 
   test("a chip fills the gap with its times", async () => {
@@ -76,17 +78,23 @@ describe("Gaps today module", () => {
     expect(call.body).toMatchObject({ startedAt: GAPS[1].startedAt, endedAt: GAPS[1].endedAt, activityId: "act-1" });
   });
 
-  test("Something else opens the form; Fill needs a subject and passes the note", async () => {
+  test("Something else opens the form; Save needs a category and passes the description", async () => {
     const { mock } = await setup();
     await screen.findByText("12:00 to 13:30");
     await userEvent.click(screen.getAllByRole("button", { name: "Something else…" })[1]);
-    const fill = screen.getByRole("button", { name: "Fill" });
-    expect(fill).toBeEnabled();
-    await userEvent.type(screen.getByPlaceholderText("Note (optional)"), "Lunch");
-    await userEvent.click(fill);
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+    await userEvent.type(screen.getByPlaceholderText("What did you do?"), "Lunch");
+    await userEvent.click(screen.getByRole("combobox", { name: "Category, 12:00 to 13:30" }));
+    const list = await screen.findByRole("listbox", { name: "Category, 12:00 to 13:30" });
+    await userEvent.click(within(list).getAllByRole("option")[0]);
+    expect(save).toBeEnabled();
+    await userEvent.click(save);
     await waitFor(() => expect(mock.calls.some((c) => c.url === "/api/segments/fill")).toBe(true));
     expect(mock.calls.find((c) => c.url === "/api/segments/fill")!.body).toMatchObject({
       startedAt: GAPS[1].startedAt,
+      endedAt: GAPS[1].endedAt,
+      categoryId: makeCategory().id,
       note: "Lunch",
     });
   });
@@ -96,7 +104,7 @@ describe("Gaps today module", () => {
     await screen.findByText("12:00 to 13:30");
     await userEvent.click(screen.getAllByRole("button", { name: "Something else…" })[0]);
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("button", { name: "Fill" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 
   test("empty state and vocabulary", async () => {

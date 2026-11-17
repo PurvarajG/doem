@@ -3,7 +3,8 @@
 // a caller-supplied channel or exposes ipcRenderer itself, so nothing in the
 // renderer can reach past this surface into Node or Electron internals.
 // Covers commands, badge/timer/notify, attention, reminders, desktop settings
-// the quick-capture window and Claude Code sessions (read-only).
+// the quick-capture window, Claude Code sessions (read-only) and lock/sleep
+// times for gap hints (read-only).
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("doem", {
@@ -51,6 +52,9 @@ contextBridge.exposeInMainWorld("doem", {
     const listener = (_event, sessions) => callback(sessions);
     ipcRenderer.on("doem:claude-sessions", listener);
     return () => ipcRenderer.removeListener("doem:claude-sessions", listener);
+  },
+  getPresence(fromISO, toISO) {
+    return ipcRenderer.invoke("doem:get-presence", { from: fromISO, to: toISO });
   },
   closeCapture() {
     ipcRenderer.send("doem:capture-close");

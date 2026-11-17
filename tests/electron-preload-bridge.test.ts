@@ -13,6 +13,7 @@ const CALLS = [
   'ipcRenderer.on("doem:capture-status", listener)',
   'ipcRenderer.invoke("doem:get-claude-sessions")',
   'ipcRenderer.on("doem:claude-sessions", listener)',
+  'ipcRenderer.invoke("doem:get-presence", { from: fromISO, to: toISO })',
   'ipcRenderer.send("doem:capture-close")',
   'ipcRenderer.send("doem:capture-saved")',
 ];
@@ -49,4 +50,6 @@ test("desktop-bridge declares the new commands, types and methods", () => {
     assert.match(bridge, new RegExp(`${m}: \\(`));
   }
   assert.match(bridge, /claudeAwareness: boolean/);
+  // Optional so a renderer served to an older desktop build degrades to no hints.
+  assert.match(bridge, /getPresence\?: \(fromISO: string, toISO: string\) => Promise<PresenceSpan\[\]>/);
 });

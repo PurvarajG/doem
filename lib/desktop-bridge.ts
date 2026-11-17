@@ -1,3 +1,5 @@
+import type { PresenceSpan } from "./types";
+
 export type DoemCommand =
   | { type: "new-task" }
   | { type: "focus-search" }
@@ -42,6 +44,8 @@ declare global {
       onCaptureStatus: (callback: (status: DoemCaptureStatus) => void) => () => void;
       getClaudeSessions: () => Promise<ClaudeSession[]>;
       onClaudeSessions: (callback: (sessions: ClaudeSession[]) => void) => () => void;
+      /** When the Mac was locked or asleep, overlapping the range. Optional: older builds lack it. */
+      getPresence?: (fromISO: string, toISO: string) => Promise<PresenceSpan[]>;
       closeCapture: () => void;
       captureSaved: () => void;
       platform: string;

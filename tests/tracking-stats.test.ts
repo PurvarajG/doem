@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test, { describe } from "node:test";
-import { minutesByProject } from "../lib/tracking-stats";
+import { coveragePercent, minutesByProject } from "../lib/tracking-stats";
 import {
   accuracyByDay,
   minutesByDay,
@@ -13,7 +13,7 @@ import {
   weekTotals,
   weekdayAverage,
 } from "../lib/tracking-stats";
-import type { Project, Segment, Task } from "../lib/types";
+import type { Project, Segment, Task, TrackingSettings } from "../lib/types";
 
 const now = new Date("2026-01-01T12:00:00.000Z");
 
@@ -223,4 +223,34 @@ test("sparkSeries averages consecutive buckets", () => {
   assert.deepEqual(sparkSeries([1, 2, 3]), [1, 2, 3]);
   assert.deepEqual(sparkSeries([2, 4, 6, 8, 10], 2), [4, 9]);
   assert.ok(sparkSeries(Array.from({ length: 28 }, (_, i) => i)).length <= 12);
+});
+
+const COVERAGE_SETTINGS: TrackingSettings = {
+  dayStartHour: 4,
+  wakingStartHour: 7,
+  wakingEndHour: 23,
+  minGapMinutes: 10,
+  moduleOrder: [],
+  hiddenModules: [],
+  collapsedModules: [],
+  hiddenNavItems: [],
+  updatedAt: "2026-03-01T09:00:00.000Z",
+};
+
+function coverageSeg(startedAt: string, endedAt: string): Segment {
+  return { id: startedAt, startedAt, endedAt, categoryId: "c", source: "backfill", createdAt: startedAt, updatedAt: startedAt };
+}
+
+describe("coveragePercent", () => {
+  test("a logged night's sleep counts only its waking-hours part", () => {
+    // 23:40 to 07:30 is 470 minutes, but only 07:00 to 07:30 is inside waking hours.
+    const sleep = coverageSeg(L(2026, 3, 1, 23, 40), L(2026, 3, 2, 7, 30));
+    const pct = coveragePercent([sleep], "2026-03-02", "2026-03-03", COVERAGE_SETTINGS, new Date(2026, 2, 3, 9));
+    assert.equal(pct, Math.round((30 / (16 * 60)) * 100));
+  });
+
+  test("today counts tracked time up to now only", () => {
+    const s = coverageSeg(L(2026, 3, 5, 7), L(2026, 3, 5, 8));
+    assert.equal(coveragePercent([s], "2026-03-05", "2026-03-05", COVERAGE_SETTINGS, new Date(2026, 2, 5, 9)), 50);
+  });
 });

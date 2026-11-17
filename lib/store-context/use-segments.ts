@@ -45,7 +45,7 @@ export type SegmentsApi = {
     activityId?: string;
     taskId?: string;
     note?: string;
-  }) => Promise<void>;
+  }) => Promise<boolean>;
   patchSegment: (
     id: string,
     patch: Partial<{
@@ -201,8 +201,10 @@ export function useSegments(onError: (message: string) => void): SegmentsApi {
         setGaps((prev) =>
           prev.filter((g) => !(g.startedAt === input.startedAt && g.endedAt === input.endedAt)),
         );
+        return true;
       } catch (error) {
         onError((error as Error).message);
+        return false;
       }
     },
     [onError],

@@ -286,6 +286,9 @@ export type Gap = {
   minutes: number;
 };
 
+/** A span the Mac was locked or asleep. Evidence for gap hints, never an entry. */
+export type PresenceSpan = { from: string; to: string; kind: "lock" | "suspend" };
+
 export type TrackingSettings = {
   dayStartHour: number;
   wakingStartHour: number;

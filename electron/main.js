@@ -27,6 +27,7 @@ const { createServerLifecycle } = require("./server-lifecycle");
 const { createReminderSchedule } = require("./reminder-schedule");
 const { createNudgeCounter, nudgeMessage } = require("./nudge");
 const { createAwayWatcher, awayPromptText } = require("./away-watcher");
+const { createPresenceLog } = require("./presence-log");
 const { scanClaudeSessions, createWaitTracker, waitingNotification, PROJECTS_SUBPATH } = require("./claude-sessions");
 const { createUpdateChecker } = require("./update-check");
 const { migrateLegacyUserData, legacyAppRunning } = require("./user-data-migration");
@@ -146,6 +147,10 @@ function userDataDir() {
  */
 function settingsFile() {
   return path.join(userDataDir(), "settings.json");
+}
+
+function presenceFile() {
+  return path.join(userDataDir(), "presence-log.json");
 }
 
 /**
@@ -1285,6 +1290,14 @@ function reminderTick() {
 
 const nudgeCounter = createNudgeCounter();
 const awayWatcher = createAwayWatcher();
+// Evidence for the gap form: when the Mac was locked or asleep, timer or not.
+const presenceLog = createPresenceLog({
+  read: () => {
+    const file = presenceFile();
+    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
+  },
+  write: (data) => writeSettingsFile(presenceFile(), `${JSON.stringify(data)}\n`),
+});
 let screenLocked = false;
 let desktopTickInterval = null;
 let awayDialogOpen = false;
@@ -1332,6 +1345,11 @@ async function refreshClaudeSessions() {
 }
 
 ipcMain.handle("doem:get-claude-sessions", () => (claudeAwareness ? claudeSessions : []));
+
+ipcMain.handle("doem:get-presence", (_event, range) => {
+  if (!range || typeof range.from !== "string" || typeof range.to !== "string") return [];
+  return presenceLog.spansBetween(range.from, range.to);
+});
 
 ipcMain.on("doem:set-desktop-settings", (_event, settings) => {
   if (!settings || typeof settings !== "object") return;
@@ -1434,10 +1452,19 @@ function startDesktopExtras() {
 
   powerMonitor.on("lock-screen", () => {
     screenLocked = true;
+    presenceLog.away(new Date(), "lock");
     awayWatcher.lock(new Date(), trayTimerStatus !== null);
+  });
+  powerMonitor.on("suspend", () => {
+    presenceLog.away(new Date(), "suspend");
+  });
+  powerMonitor.on("resume", () => {
+    // A locked Mac is not back until it is unlocked.
+    if (!screenLocked) presenceLog.back(new Date());
   });
   powerMonitor.on("unlock-screen", () => {
     screenLocked = false;
+    presenceLog.back(new Date());
     nudgeCounter.reset();
     const away = awayWatcher.unlock(new Date(), trayTimerStatus !== null);
     if (away) showAwayPrompt(away).catch((err) => logLine(`[doem] away prompt failed: ${err.message}`));

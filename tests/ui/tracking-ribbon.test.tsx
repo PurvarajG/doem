@@ -66,7 +66,8 @@ describe("RibbonModule", () => {
   test("clicking a gap opens the fill form", async () => {
     setup();
     fireEvent.click(await screen.findByText("1h gap"));
-    expect(await screen.findByRole("button", { name: /fill/i })).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("What did you do?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add a cut" })).toBeInTheDocument();
   });
 
   test("clicking a segment opens the editor; Save patches only a changed task", async () => {
